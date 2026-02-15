@@ -44,17 +44,16 @@ fun TvPasswordField(
     var textFocused by remember { mutableStateOf(false) }
     var eyeFocused by remember { mutableStateOf(false) }
 
-    val isEditing = editingId == id
+    //val isEditing = editingId == id
 
-    // když vstoupíš do edit mode, vynuť focus + otevři IME
-    LaunchedEffect(isEditing) {
+    /*LaunchedEffect(isEditing) {
         if (isEditing) {
             textFocus.requestFocus()
             keyboard?.show()
         } else {
             keyboard?.hide()
         }
-    }
+    }*/
 
     val icon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
     val desc =
@@ -67,8 +66,7 @@ fun TvPasswordField(
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
 
-        // klávesnice jen v edit mode
-        readOnly = !isEditing,
+        //readOnly = !isEditing,
 
         visualTransformation = if (passwordVisible) {
             VisualTransformation.None
@@ -78,9 +76,8 @@ fun TvPasswordField(
 
         modifier = modifier
             .focusRequester(textFocus)
-            .onFocusChanged {
+            /*.onFocusChanged {
                 textFocused = it.isFocused
-                // když odfokusuješ text a edituješ, ukonči edit
                 if (!it.isFocused && isEditing) setEditingId(null)
             }
             .onKeyEvent { ev ->
@@ -90,12 +87,11 @@ fun TvPasswordField(
                     // OK na textu -> vstup do edit
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                         if (textFocused && !isEditing) {
-                            setEditingId(id) // LaunchedEffect otevře IME
+                            setEditingId(id)
                             true
                         } else false
                     }
 
-                    // BACK -> konec edit
                     Key.Back -> {
                         if (isEditing) {
                             setEditingId(null)
@@ -103,7 +99,6 @@ fun TvPasswordField(
                         } else false
                     }
 
-                    // RIGHT -> když nejsi v edit, přesuň se na očičko
                     Key.DirectionRight -> {
                         if (textFocused && !isEditing) {
                             eyeFocus.requestFocus()
@@ -113,7 +108,7 @@ fun TvPasswordField(
 
                     else -> false
                 }
-            },
+            }*/,
 
         trailingIcon = {
             IconButton(
@@ -122,23 +117,20 @@ fun TvPasswordField(
                 modifier = Modifier
                     .focusRequester(eyeFocus)
                     .onFocusChanged { eyeFocused = it.isFocused }
-                    .onKeyEvent { ev ->
+                    /*.onKeyEvent { ev ->
                         if (ev.type != KeyEventType.KeyDown) return@onKeyEvent false
 
                         when (ev.key) {
-                            // OK na očku -> toggle
                             Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                                 passwordVisible = !passwordVisible
                                 true
                             }
 
-                            // LEFT -> zpět do textu (a zůstaň mimo edit mode)
                             Key.DirectionLeft -> {
                                 textFocus.requestFocus()
                                 true
                             }
 
-                            // BACK -> když jsi na očku a náhodou edituješ, ukonči edit
                             Key.Back -> {
                                 if (isEditing) {
                                     setEditingId(null)
@@ -148,7 +140,7 @@ fun TvPasswordField(
 
                             else -> false
                         }
-                    }
+                    }*/
             ) {
                 Icon(imageVector = icon, contentDescription = desc)
             }
