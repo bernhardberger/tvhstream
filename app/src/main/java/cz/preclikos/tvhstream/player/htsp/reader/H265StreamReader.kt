@@ -1,6 +1,5 @@
 package cz.preclikos.tvhstream.player.htsp.reader
 
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -12,6 +11,7 @@ import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.HevcConfig
 import androidx.media3.extractor.TrackOutput
 import cz.preclikos.tvhstream.htsp.HtspMessage
+import cz.preclikos.tvhstream.player.htsp.utils.AspectRatioUtils
 import timber.log.Timber
 import kotlin.math.abs
 
@@ -59,10 +59,19 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
                 if (sps != null) {
                     pixelRatio = parseHevcPixelWidthHeightRatioFromSpsNal(sps)
                 }
+                val w = stream.int("width") ?: Format.NO_VALUE
+                val h = stream.int("height") ?: Format.NO_VALUE
+                if (w > 0 && h > 0 && pixelRatio != Format.NO_VALUE.toFloat() && pixelRatio.isFinite() && pixelRatio > 0f) {
+                    pixelRatio = AspectRatioUtils.adjustSarForBroadcast(
+                        codedW = w,
+                        codedH = h,
+                        sar = pixelRatio
+                    ) { Timber.d(it) }
+                }
             } catch (_: ParserException) {
                 // ignore
             } catch (t: Throwable) {
-                Log.w("H265StreamReader", "HVCC/SPS SAR parse failed: ${t.message}")
+                Timber.w("HVCC/SPS SAR parse failed: ${t.message}")
             }
         }
 
@@ -110,33 +119,42 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         if (shouldProbe) {
             val spsNal = extractFirstHevcSpsNalAnnexB(payload)
             if (spsNal != null) {
-                val newRatio = parseHevcPixelWidthHeightRatioFromSpsNal(spsNal)
-                val ratioValid = newRatio != Format.NO_VALUE.toFloat() &&
-                        newRatio > 0f && newRatio.isFinite()
+                val rawSar = parseHevcPixelWidthHeightRatioFromSpsNal(spsNal)
+                val ratioValid = rawSar != Format.NO_VALUE.toFloat() &&
+                        rawSar > 0f && rawSar.isFinite()
 
                 if (ratioValid) {
+                    val w = baseFormat?.width ?: -1
+                    val h = baseFormat?.height ?: -1
+
+                    val newSar =
+                        if (w > 0 && h > 0)
+                            AspectRatioUtils.adjustSarForBroadcast(
+                                codedW = w,
+                                codedH = h,
+                                sar = rawSar
+                            ) { Timber.d(it) }
+                        else rawSar
+
                     val ratioChanged =
                         (lastPixelRatio == Format.NO_VALUE.toFloat()) ||
-                                abs(newRatio - lastPixelRatio) > RATIO_EPS
+                                abs(newSar - lastPixelRatio) > RATIO_EPS
 
                     if (ratioChanged) {
                         val t = track
                         val base = baseFormat
                         if (t != null && base != null) {
                             val updated = base.buildUpon()
-                                .setPixelWidthHeightRatio(newRatio)
+                                .setPixelWidthHeightRatio(newSar)
                                 .build()
                             t.format(updated)
 
                             baseFormat = updated
-                            lastPixelRatio = newRatio
+                            lastPixelRatio = newSar
                             configured = true
                             lastFormatUpdatePts = pts
 
-                            Log.d(
-                                "H265StreamReader",
-                                "Format updated: pixelWidthHeightRatio=$newRatio"
-                            )
+                            Timber.d("Format updated: SAR=$newSar (raw=$rawSar)")
                         }
                     } else {
                         configured = true
@@ -146,11 +164,9 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
             }
         }
 
-        // --- sample flags ---
         var bufferFlags = 0
         if (isKey) bufferFlags = bufferFlags or C.BUFFER_FLAG_KEY_FRAME
 
-        // --- write sample (tvoje cesta) ---
         val pba = ParsableByteArray(payload)
         track!!.sampleData(pba, payload.size)
         track!!.sampleMetadata(pts, bufferFlags, payload.size, 0, null)
@@ -197,7 +213,6 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
             val nalStart = i + startLen
             if (nalStart + 2 > payload.size) return null
 
-            // HEVC NAL header = 2 bytes, nal_unit_type is bits [1..6] of first byte
             val b0 = payload[nalStart].toInt() and 0xFF
             val nalUnitType = (b0 ushr 1) and 0x3F
             if (nalUnitType == 33) {
@@ -223,7 +238,6 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
     }
 
     private fun findHevcSpsInsideInitData(initData: List<ByteArray>): ByteArray? {
-        // někdy initData obsahuje více NALů; zkus projít a najít SPS
         for (b in initData) {
             if (looksLikeHevcSpsNal(b)) return b
         }

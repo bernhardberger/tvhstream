@@ -10,6 +10,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.TrackOutput
 import cz.preclikos.tvhstream.htsp.HtspMessage
+import cz.preclikos.tvhstream.player.htsp.utils.AspectRatioUtils
+import timber.log.Timber
 
 @OptIn(UnstableApi::class)
 internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
@@ -76,39 +78,42 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         if (shouldProbe) {
             val ar = parseMpeg2AspectRatioFromSequenceHeader(payload)
             if (ar != null) {
-                // když se AR nezměnil, nemusíme nic dělat
                 val arChanged = (lastAspectInfo == null || lastAspectInfo != ar)
 
-                val (width, height) = (baseFormat?.width ?: Format.NO_VALUE) to (baseFormat?.height
-                    ?: Format.NO_VALUE)
-                val pixelRatio = mpeg2ArToPixelRatio(width, height, ar)
+                val w = baseFormat?.width ?: Format.NO_VALUE
+                val h = baseFormat?.height ?: Format.NO_VALUE
 
-                if (pixelRatio != null) {
-                    val ratioChanged = lastPixelRatio == Format.NO_VALUE.toFloat() ||
-                            kotlin.math.abs(pixelRatio - lastPixelRatio) > RATIO_EPS
+                val rawSar = mpeg2ArToPixelRatio(w, h, ar)
+                if (rawSar != null && rawSar.isFinite() && rawSar > 0f) {
+
+                    val newSar = AspectRatioUtils.adjustSarForBroadcast(
+                        codedW = w,
+                        codedH = h,
+                        sar = rawSar
+                    ) { Log.d("Mpeg2VideoStreamReader", it) }
+
+                    val ratioChanged =
+                        lastPixelRatio == Format.NO_VALUE.toFloat() ||
+                                kotlin.math.abs(newSar - lastPixelRatio) > RATIO_EPS
 
                     if (arChanged || ratioChanged) {
                         val t = track
                         val base = baseFormat
                         if (t != null && base != null) {
                             val updated = base.buildUpon()
-                                .setPixelWidthHeightRatio(pixelRatio)
+                                .setPixelWidthHeightRatio(newSar)
                                 .build()
 
                             t.format(updated)
                             baseFormat = updated
-                            lastPixelRatio = pixelRatio
+                            lastPixelRatio = newSar
                             lastAspectInfo = ar
                             configured = true
                             lastFormatUpdatePts = pts
 
-                            Log.d(
-                                "Mpeg2VideoStreamReader",
-                                "Format updated: ratio=$pixelRatio (AR=$ar) ${width}x${height}"
-                            )
+                            Timber.d("Format updated: SAR=$newSar (raw=$rawSar, AR=$ar) ${w}x${h}")
                         }
                     } else {
-                        // máme to stejné, jen si ulož, že už víme AR (ať se to uklidní)
                         configured = true
                         lastAspectInfo = ar
                         lastFormatUpdatePts = pts
