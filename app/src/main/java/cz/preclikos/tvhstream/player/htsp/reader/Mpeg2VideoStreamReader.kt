@@ -1,6 +1,5 @@
 package cz.preclikos.tvhstream.player.htsp.reader
 
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -26,7 +25,6 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
     private var configured = false
 
     override fun createTracks(stream: HtspMessage, output: ExtractorOutput) {
-        // id může být streamIndex, nebo postupně – ty to máš přes factory, takhle je OK:
         val streamIndex = stream.int("index") ?: 0
         val t = output.track(streamIndex, C.TRACK_TYPE_VIDEO)
         track = t
@@ -57,7 +55,6 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
             .setHeight(height)
             .apply {
                 if (frameRate != Format.NO_VALUE.toFloat()) setFrameRate(frameRate)
-                // pixelWidthHeightRatio zatím neznáme – doplníme po přečtení seq headeru z payloadu
             }
             .build()
     }
@@ -68,10 +65,6 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         val pts = (message.fields["pts"] as? Number)?.toLong() ?: 0L
         val frameType = message.int("frametype") ?: -1
 
-        // --- 1) Update format only when needed ---
-        // Skenujeme:
-        // - pokud ještě nejsme configured
-        // - nebo (volitelně) když uběhl cooldown (pro případ, že se AR změní v čase)
         val shouldProbe =
             !configured || (pts - lastFormatUpdatePts) >= FORMAT_UPDATE_COOLDOWN_US
 
@@ -90,7 +83,7 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
                         codedW = w,
                         codedH = h,
                         sar = rawSar
-                    ) { Log.d("Mpeg2VideoStreamReader", it) }
+                    ) { Timber.d(it) }
 
                     val ratioChanged =
                         lastPixelRatio == Format.NO_VALUE.toFloat() ||
@@ -122,29 +115,16 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
             }
         }
 
-        // --- 2) Sample flags ---
         var bufferFlags = 0
         if (frameType == -1 || frameType == 73) {
             bufferFlags = bufferFlags or C.BUFFER_FLAG_KEY_FRAME
         }
 
-        // --- 3) Write sample ---
         val pba = ParsableByteArray(payload)
         track!!.sampleData(pba, payload.size)
         track!!.sampleMetadata(pts, bufferFlags, payload.size, 0, null)
     }
 
-    /**
-     * MPEG-2 sequence header start code: 00 00 01 B3
-     * Za tím:
-     * - horizontal_size_value 12b
-     * - vertical_size_value   12b
-     * - aspect_ratio_info      4b  <-- to nás zajímá
-     * - frame_rate_code        4b
-     *
-     * Vrací aspect_ratio_info (Int), typicky:
-     * 2=4:3, 3=16:9, 4=2.21:1
-     */
     private fun parseMpeg2AspectRatioFromSequenceHeader(payload: ByteArray): Int? {
         // projdeme prvních pár KB, stačí bohatě
         val limit = minOf(payload.size - 7, 4096)
@@ -184,15 +164,6 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         return null
     }
 
-    /**
-     * Převod MPEG2 aspect_ratio_info + rozlišení -> pixelWidthHeightRatio (PAR).
-     *
-     * Pro SD se reálně používá:
-     * - PAL 720x576: 4:3 => 16/15, 16:9 => 64/45
-     * - NTSC 720x480: 4:3 => 8/9, 16:9 => 32/27
-     *
-     * Pro HD obvykle 1:1 (už je square pixels).
-     */
     private fun mpeg2ArToPixelRatio(width: Int, height: Int, aspectRatioInfo: Int): Float? {
         if (width <= 0 || height <= 0 || width == Format.NO_VALUE || height == Format.NO_VALUE) return null
 

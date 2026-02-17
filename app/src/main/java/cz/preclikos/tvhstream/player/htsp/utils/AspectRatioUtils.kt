@@ -5,7 +5,6 @@ import kotlin.math.abs
 internal object AspectRatioUtils {
 
     private fun bestTargetError(dar: Float): Float {
-        // běžné cíle pro TV UI
         val targets = floatArrayOf(16f / 9f, 4f / 3f)
         var best = Float.MAX_VALUE
         for (t in targets) best = minOf(best, abs(dar - t))
@@ -15,11 +14,6 @@ internal object AspectRatioUtils {
     private fun near(a: Float, b: Float, eps: Float): Boolean =
         a.isFinite() && b.isFinite() && abs(a - b) <= eps
 
-    /**
-     * DVB/TV-style “clean aperture” korekce SAR.
-     * Vstup = SAR (pixelWidthHeightRatio) odvozený z bitstreamu (SPS / MPEG2 AR / atd.).
-     * Výstup = SAR', který se nastaví do Media3 Format.setPixelWidthHeightRatio().
-     */
     fun adjustSarForBroadcast(
         codedW: Int,
         codedH: Int,
@@ -34,7 +28,6 @@ internal object AspectRatioUtils {
         var bestSar = sar
         var bestActiveW = codedW.toFloat()
 
-        // Kandidáti “active width” (clean aperture). Pro jiné rozlišení to necháváme být.
         val activeWidthCandidates: FloatArray = when {
             codedW == 720 && codedH == 576 -> floatArrayOf(720f, 704f, 702f, 706f)
             codedW == 720 && codedH == 480 -> floatArrayOf(720f, 704f, 711f)

@@ -51,7 +51,6 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
                 val hevcConfig = HevcConfig.parse(ParsableByteArray(stream.bin("meta")!!))
                 initData = hevcConfig.initializationData
 
-                // Zkus SAR ze SPS v initData (když je SPS dostupné)
                 val sps =
                     initData.firstOrNull { looksLikeHevcSpsNal(it) } ?: findHevcSpsInsideInitData(
                         initData
@@ -244,20 +243,12 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         return null
     }
 
-    /**
-     * Vytáhne pixelWidthHeightRatio (SAR) z HEVC SPS NAL.
-     * NAL je bez start code, obsahuje 2B header.
-     * Vrací Format.NO_VALUE.toFloat() pokud VUI/aspect není přítomné.
-     */
     private fun parseHevcPixelWidthHeightRatioFromSpsNal(spsNalNoStart: ByteArray): Float {
-        // Remove emulation prevention bytes, ale až po odstranění 2B NAL headeru
         if (spsNalNoStart.size < 3) return Format.NO_VALUE.toFloat()
 
         val rbsp = unescapeRbsp(spsNalNoStart)
 
         val br = BitReader(rbsp)
-
-        // NAL header (2 bytes) – přeskoč
         br.readBits(16)
 
         // sps_video_parameter_set_id: u(4)
@@ -309,9 +300,6 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         if (scalingListEnabled) {
             val spsScalingListDataPresent = br.readBits(1) == 1
             if (spsScalingListDataPresent) {
-                // scaling_list_data() je velké → přeskočíme “hrubě” by parse, ale pro SAR ho nepotřebujeme.
-                // V praxi u broadcastu často není, nebo je to OK ignorovat přes "try-catch" styl.
-                // Zde radši rychle skončíme bez SAR, než riskovat desync bitreaderu.
                 return Format.NO_VALUE.toFloat()
             }
         }
@@ -330,9 +318,6 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
 
         val numShortTermRefPicSets = br.readUe()
         for (i in 0 until numShortTermRefPicSets) {
-            // short_term_ref_pic_set() je dost složité
-            // Pro broadcast SPS se to obvykle dá přeskočit jen pokud bys měl plný parser.
-            // Bez něj riskuješ rozhození bit pozice -> radši to vzdáme.
             return Format.NO_VALUE.toFloat()
         }
 
@@ -340,9 +325,6 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         if (longTermRefPicsPresent) {
             val numLongTerm = br.readUe()
             repeat(numLongTerm) {
-                // lt_ref_pic_poc_lsb_sps: u(v) kde v = log2_max_pic_order_cnt_lsb_minus4 + 4
-                // nemáme v ruce přesně, ale je to br.readBits(...)
-                // radši ne
                 return Format.NO_VALUE.toFloat()
             }
         }
