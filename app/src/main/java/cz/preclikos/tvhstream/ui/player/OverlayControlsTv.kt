@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,11 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,171 +92,189 @@ fun OverlayControlsTv(
     val title = remember(nowEvent, channelName) { nowEvent?.title ?: channelName }
     val summary = remember(nowEvent) { nowEvent?.summary?.trim().orEmpty() }
 
-    Box(Modifier.fillMaxSize()) {
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .background(topGradient)
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bottomGradient)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+            // Progress + čas
+            Text(
+                text = centerTimeText,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                color = Color.White,
+                trackColor = Color.White.copy(alpha = 0.22f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                Column(Modifier.weight(1f)) {
+                // Next event — absolutní střed obrazovky
+                if (nextEvent != null) {
+                    val nextRange = remember(nextEvent) { nextEvent.timeRangeText() ?: "" }
+                    val text = if (nextRange.isNotEmpty()) {
+                        stringResource(
+                            R.string.player_next_event_with_range,
+                            nextEvent.title,
+                            nextRange
+                        )
+                    } else {
+                        stringResource(R.string.player_next_event, nextEvent.title)
+                    }
                     Text(
-                        text = title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
+                        text = text,
+                        color = Color.White.copy(alpha = 0.80f),
+                        style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (summary.isNotEmpty()) {
-                        Text(
-                            text = summary,
-                            color = Color.White.copy(alpha = 0.86f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(clock, color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    if (endsAt.isNotEmpty()) {
-                        Text(
-                            text = stringResource(
-                                id = R.string.player_ends_in, endsAt
-                            ),
-                            color = Color.White.copy(alpha = 0.90f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(bottomGradient)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Row(
-                Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom
-            ) {
-
-                RoundIconButton(
-                    icon = { Icon(Icons.Filled.Stop, contentDescription = "Stop") },
-                    onClick = { onUserInteraction(); onBack() },
-                    focusRequester = stopFR,
-                    onFocused = { lastFocused = 0 })
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = centerTimeText,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    LinearProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
-                        color = Color.White,
-                        trackColor = Color.White.copy(alpha = 0.22f),
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(4.dp)
+                            .padding(horizontal = 120.dp)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+
+                    RoundIconButton(
+                        icon = { Icon(Icons.Filled.Stop, contentDescription = "Stop") },
+                        onClick = { onUserInteraction(); onBack() },
+                        focusRequester = stopFR,
+                        onFocused = { lastFocused = 0 }
                     )
 
-                    if (nextEvent != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        RoundIconButton(
+                            icon = {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Canvas(modifier = Modifier.size(28.dp)) {
+                                        val strokeWidth = 2.5f
+                                        val cap = StrokeCap.Round
+                                        val color = Color.White
+                                        val s = size.width * 0.28f
 
-                        val nextRange = remember(nextEvent) { nextEvent.timeRangeText() ?: "" }
-                        val text = if (nextRange.isNotEmpty()) {
-                            stringResource(
-                                id = R.string.player_next_event_with_range,
-                                nextEvent.title,
-                                nextRange
-                            )
-                        } else {
-                            stringResource(
-                                id = R.string.player_next_event, nextEvent.title
-                            )
-                        }
-                        Text(
-                            text = text,
-                            color = Color.White.copy(alpha = 0.80f),
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 6.dp)
+                                        drawLine(
+                                            color,
+                                            Offset(0f, s),
+                                            Offset(0f, 0f),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(0f, 0f),
+                                            Offset(s, 0f),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(size.width - s, 0f),
+                                            Offset(size.width, 0f),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(size.width, 0f),
+                                            Offset(size.width, s),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(0f, size.height - s),
+                                            Offset(0f, size.height),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(0f, size.height),
+                                            Offset(s, size.height),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(size.width - s, size.height),
+                                            Offset(size.width, size.height),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                        drawLine(
+                                            color,
+                                            Offset(size.width, size.height - s),
+                                            Offset(size.width, size.height),
+                                            strokeWidth,
+                                            cap
+                                        )
+                                    }
+                                    Text(
+                                        text = when (aspectRatio) {
+                                            AspectRatioMode.FIT -> "AUTO"
+                                            AspectRatioMode.FORCE_16_9 -> "16:9"
+                                            AspectRatioMode.FORCE_4_3 -> "4:3"
+                                        },
+                                        color = Color.White,
+                                        fontSize = 7.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = { onUserInteraction(); onAspectRatioChange() },
+                            focusRequester = aspectFR,
+                            onFocused = { lastFocused = 3 }
+                        )
+                        RoundIconButton(
+                            icon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.VolumeUp,
+                                    contentDescription = "Audio"
+                                )
+                            },
+                            onClick = { onUserInteraction(); showAudio = true },
+                            focusRequester = audioFR,
+                            onFocused = { lastFocused = 1 }
+                        )
+                        RoundIconButton(
+                            icon = {
+                                Icon(
+                                    Icons.Filled.Subtitles,
+                                    contentDescription = "Subtitles"
+                                )
+                            },
+                            onClick = { onUserInteraction(); showSubs = true },
+                            focusRequester = subsFR,
+                            onFocused = { lastFocused = 2 }
                         )
                     }
                 }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    RoundIconButton(
-                        icon = {
-                            Box(contentAlignment = Alignment.Center) {
-                                Canvas(modifier = Modifier.size(28.dp)) {
-                                    val strokeWidth = 2.5f
-                                    val cap = StrokeCap.Round
-                                    val color = Color.White
-                                    val s = size.width * 0.28f
-
-                                    drawLine(color, Offset(0f, s), Offset(0f, 0f), strokeWidth, cap)
-                                    drawLine(color, Offset(0f, 0f), Offset(s, 0f), strokeWidth, cap)
-                                    drawLine(color, Offset(size.width - s, 0f), Offset(size.width, 0f), strokeWidth, cap)
-                                    drawLine(color, Offset(size.width, 0f), Offset(size.width, s), strokeWidth, cap)
-                                    drawLine(color, Offset(0f, size.height - s), Offset(0f, size.height), strokeWidth, cap)
-                                    drawLine(color, Offset(0f, size.height), Offset(s, size.height), strokeWidth, cap)
-                                    drawLine(color, Offset(size.width - s, size.height), Offset(size.width, size.height), strokeWidth, cap)
-                                    drawLine(color, Offset(size.width, size.height - s), Offset(size.width, size.height), strokeWidth, cap)
-                                }
-                                Text(
-                                    text = when (aspectRatio) {
-                                        AspectRatioMode.FIT        -> "AUTO"
-                                        AspectRatioMode.FORCE_16_9 -> "16:9"
-                                        AspectRatioMode.FORCE_4_3  -> "4:3"
-                                    },
-                                    color = Color.White,
-                                    fontSize = 7.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        },
-                        onClick = { onUserInteraction(); onAspectRatioChange() },
-                        focusRequester = aspectFR,
-                        onFocused = { lastFocused = 3 }
-                    )
-                    RoundIconButton(
-                        icon = {
-                        Icon(
-                            Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Audio"
-                        )
-                    },
-                        onClick = { onUserInteraction(); showAudio = true },
-                        focusRequester = audioFR,
-                        onFocused = { lastFocused = 1 })
-                    RoundIconButton(
-                        icon = { Icon(Icons.Filled.Subtitles, contentDescription = "Subtitles") },
-                        onClick = { onUserInteraction(); showSubs = true },
-                        focusRequester = subsFR,
-                        onFocused = { lastFocused = 2 })
-                }
             }
+
         }
     }
 
