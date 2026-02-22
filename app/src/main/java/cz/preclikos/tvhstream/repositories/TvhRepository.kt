@@ -48,6 +48,9 @@ class TvhRepository(
      */
     private val warmupFutureSec = 4 * 3600L
 
+    @Volatile
+    private var warmupCompleted = false
+
     /**
      * After warmup, keep at least this much future ahead (top-up when below).
      */
@@ -223,6 +226,7 @@ class TvhRepository(
                 if (targets.isEmpty()) {
                     val (warmDone, total) = stateMutex.withLock { warmupProgressLocked(nowSec) }
                     if (total > 0 && warmDone >= total) {
+                        warmupCompleted = true
                         setStatusThrottled(
                             UiText.Res(R.string.status_epg_steady_warmup, listOf(warmDone, total)),
                             StatusSlot.EPG,
@@ -416,49 +420,31 @@ class TvhRepository(
     }
 
     private fun handleChannelLocked(msg: HtspMessage) {
-        when (msg.method) {
-            "channelAdd" -> {
-                val id = msg.int("channelId") ?: return
-                val name = msg.str("channelName") ?: return
-                val number =
-                    msg.int("channelNumber")
-                        ?: msg.int("number")
-                        ?: msg.int("lcn")
-                        ?: msg.int("channelNum")
-                        ?: msg.int("channelno")
-                val icon = msg.str("channelIcon")
-                channelMap[id] = ChannelEntry(id, name, number, icon)
-                epgCoverage.getOrPut(id) { EpgCoverage() }
+        val id = msg.int("channelId") ?: return
+        val existing = channelMap[id]
+        val isNew = existing == null
 
-                publishChannelsLocked()
-                setStatusThrottled(
-                    UiText.Res(R.string.status_syncing_channels, listOf(channelMap.size)),
-                    StatusSlot.SYNC,
-                    minIntervalMs = 700
-                )
-            }
+        val name = msg.str("channelName") ?: existing?.name ?: return
+        val number = msg.int("channelNumber")
+            ?: msg.int("number")
+            ?: msg.int("lcn")
+            ?: msg.int("channelNum")
+            ?: msg.int("channelno")
+            ?: existing?.number
+        val icon = msg.str("channelIcon") ?: existing?.icon
 
-            "channelUpdate" -> {
-                val id = msg.int("channelId") ?: return
-                val existing = channelMap[id] ?: return
+        channelMap[id] = ChannelEntry(id, name, number, icon)
+        epgCoverage.getOrPut(id) { EpgCoverage() }
 
-                val newName = msg.str("channelName") ?: existing.name
-                val newNumber =
-                    msg.int("channelNumber")
-                        ?: msg.int("number")
-                        ?: msg.int("lcn")
-                        ?: msg.int("channelNum")
-                        ?: msg.int("channelno")
-                        ?: existing.number
-                val icon = msg.str("channelIcon")
-                channelMap[id] = existing.copy(name = newName, number = newNumber, icon = icon)
-                publishChannelsLocked()
-                setStatusThrottled(
-                    UiText.Res(R.string.status_syncing_channels, listOf(channelMap.size)),
-                    StatusSlot.SYNC,
-                    minIntervalMs = 700
-                )
-            }
+        publishChannelsLocked()
+        setStatusThrottled(
+            UiText.Res(R.string.status_syncing_channels, listOf(channelMap.size)),
+            StatusSlot.SYNC,
+            minIntervalMs = 700
+        )
+
+        if (isNew && warmupCompleted) {
+            scope.launch { fetchEpgTopUpOnce(channelId = id, nowSec = nowSec()) }
         }
     }
 

@@ -1,5 +1,6 @@
 package cz.preclikos.tvhstream.ui.player
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Stop
@@ -29,10 +31,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
@@ -50,7 +58,9 @@ fun OverlayControlsTv(
     nowSec: Long,
     controlsVisible: Boolean,
     onBack: () -> Unit,
-    onUserInteraction: () -> Unit
+    onUserInteraction: () -> Unit,
+    aspectRatio: AspectRatioMode,
+    onAspectRatioChange: () -> Unit,
 ) {
     var showAudio by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
@@ -60,7 +70,8 @@ fun OverlayControlsTv(
     val stopFR = remember { FocusRequester() }
     val audioFR = remember { FocusRequester() }
     val subsFR = remember { FocusRequester() }
-    val focusRequesters = remember { listOf(stopFR, audioFR, subsFR) }
+    val aspectFR = remember { FocusRequester() }
+    val focusRequesters = remember { listOf(stopFR, audioFR, subsFR, aspectFR) }
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
@@ -198,6 +209,40 @@ fun OverlayControlsTv(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RoundIconButton(
+                        icon = {
+                            Box(contentAlignment = Alignment.Center) {
+                                Canvas(modifier = Modifier.size(28.dp)) {
+                                    val strokeWidth = 2.5f
+                                    val cap = StrokeCap.Round
+                                    val color = Color.White
+                                    val s = size.width * 0.28f
+
+                                    drawLine(color, Offset(0f, s), Offset(0f, 0f), strokeWidth, cap)
+                                    drawLine(color, Offset(0f, 0f), Offset(s, 0f), strokeWidth, cap)
+                                    drawLine(color, Offset(size.width - s, 0f), Offset(size.width, 0f), strokeWidth, cap)
+                                    drawLine(color, Offset(size.width, 0f), Offset(size.width, s), strokeWidth, cap)
+                                    drawLine(color, Offset(0f, size.height - s), Offset(0f, size.height), strokeWidth, cap)
+                                    drawLine(color, Offset(0f, size.height), Offset(s, size.height), strokeWidth, cap)
+                                    drawLine(color, Offset(size.width - s, size.height), Offset(size.width, size.height), strokeWidth, cap)
+                                    drawLine(color, Offset(size.width, size.height - s), Offset(size.width, size.height), strokeWidth, cap)
+                                }
+                                Text(
+                                    text = when (aspectRatio) {
+                                        AspectRatioMode.FIT        -> "AUTO"
+                                        AspectRatioMode.FORCE_16_9 -> "16:9"
+                                        AspectRatioMode.FORCE_4_3  -> "4:3"
+                                    },
+                                    color = Color.White,
+                                    fontSize = 7.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        },
+                        onClick = { onUserInteraction(); onAspectRatioChange() },
+                        focusRequester = aspectFR,
+                        onFocused = { lastFocused = 3 }
+                    )
                     RoundIconButton(
                         icon = {
                         Icon(

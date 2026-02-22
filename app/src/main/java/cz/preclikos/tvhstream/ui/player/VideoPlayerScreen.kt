@@ -10,8 +10,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +40,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import cz.preclikos.tvhstream.htsp.ConnectionState
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
@@ -63,6 +66,8 @@ val bottomGradient = Brush.verticalGradient(
     0.70f to Color.Black.copy(alpha = 0.75f),
     1f to Color.Black.copy(alpha = 0.92f)
 )
+
+enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -95,7 +100,7 @@ fun VideoPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val ctx = LocalContext.current
     val player = remember { videoPlayerViewModel.getPlayerInstance(ctx) }
-
+    var aspectRatio by remember { mutableStateOf(AspectRatioMode.FIT) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -249,19 +254,36 @@ fun VideoPlayerScreen(
                 }
             }
     ) {
-
-        AndroidView(
-            factory = { context ->
-                PlayerView(context).apply {
-                    this.player = player
-                    useController = false
-                    controllerAutoShow = false
-                    keepScreenOn = true
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            AndroidView(
+                factory = { context ->
+                    PlayerView(context).apply {
+                        this.player = player
+                        useController = false
+                        controllerAutoShow = false
+                        keepScreenOn = true
+                    }
+                },
+                update = { view ->
+                    view.resizeMode = when (aspectRatio) {
+                        AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        AspectRatioMode.FORCE_16_9,
+                        AspectRatioMode.FORCE_4_3 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    }
+                },
+                modifier = Modifier
+                    .then(
+                        when (aspectRatio) {
+                            AspectRatioMode.FIT -> Modifier.fillMaxSize()
+                            AspectRatioMode.FORCE_16_9 -> Modifier.aspectRatio(16f / 9f)
+                            AspectRatioMode.FORCE_4_3 -> Modifier.aspectRatio(4f / 3f)
+                        }
+                    )
+            )
+        }
         AnimatedVisibility(
             visible = showDrawer,
             enter = slideInHorizontally(tween(180)) { -it },
@@ -306,7 +328,16 @@ fun VideoPlayerScreen(
                 nowSec = nowSec,
                 controlsVisible = controlsVisible,
                 onBack = onClose,
-                onUserInteraction = { interactionToken++ }
+                onUserInteraction = { interactionToken++ },
+                aspectRatio = aspectRatio,
+                onAspectRatioChange = {
+                    aspectRatio = when (aspectRatio) {
+                        AspectRatioMode.FIT -> AspectRatioMode.FORCE_16_9
+                        AspectRatioMode.FORCE_16_9 -> AspectRatioMode.FORCE_4_3
+                        AspectRatioMode.FORCE_4_3 -> AspectRatioMode.FIT
+                    }
+                },
+
             )
         }
     }
