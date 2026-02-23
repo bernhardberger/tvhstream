@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
+import cz.preclikos.tvhstream.settings.AspectRatioMode
 import cz.preclikos.tvhstream.ui.common.formatClock
 import cz.preclikos.tvhstream.ui.common.formatHms
 import cz.preclikos.tvhstream.ui.common.progress

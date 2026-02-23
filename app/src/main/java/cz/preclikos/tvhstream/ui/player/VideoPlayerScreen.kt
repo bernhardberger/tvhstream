@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +22,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +43,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import cz.preclikos.tvhstream.htsp.ConnectionState
+import cz.preclikos.tvhstream.settings.AspectRatioMode
+import cz.preclikos.tvhstream.settings.PlayerSettings
+import cz.preclikos.tvhstream.settings.PlayerSettingsStore
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.ui.common.nextAfter
 import cz.preclikos.tvhstream.ui.common.nowEvent
@@ -50,6 +53,7 @@ import cz.preclikos.tvhstream.ui.components.KeepScreenOn
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import cz.preclikos.tvhstream.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -67,19 +71,24 @@ val bottomGradient = Brush.verticalGradient(
     1f to Color.Black.copy(alpha = 0.92f)
 )
 
-enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
-
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(
     videoPlayerViewModel: VideoPlayerViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
+    settingsStore: PlayerSettingsStore = koinInject(),
     channelsVm: ChannelsViewModel = koinViewModel(),
     channelId: Int,
     channelName: String,
     serviceId: Int,
     onClose: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+
+    val settings by settingsStore.playerSettings.collectAsState(
+        initial = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
+    )
+
     val connState by videoPlayerViewModel.connectionState.collectAsState()
     val channels by channelsVm.channels.collectAsState()
     val selectedInitId by selection.selectedId.collectAsState()
@@ -100,7 +109,11 @@ fun VideoPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val ctx = LocalContext.current
     val player = remember { videoPlayerViewModel.getPlayerInstance(ctx) }
-    var aspectRatio by remember { mutableStateOf(AspectRatioMode.FIT) }
+    var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
+
+    LaunchedEffect(settings.aspectRatio) {
+        aspectRatio = settings.aspectRatio
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -336,8 +349,8 @@ fun VideoPlayerScreen(
                         AspectRatioMode.FORCE_16_9 -> AspectRatioMode.FORCE_4_3
                         AspectRatioMode.FORCE_4_3 -> AspectRatioMode.FIT
                     }
-                },
-
+                    scope.launch { settingsStore.setAspectRatio(aspectRatio) }
+                }
             )
         }
     }

@@ -85,11 +85,12 @@ class SettingsPlayerViewModel(
                 }
         }
     }
+
     fun onProfileSelected(profile: ProfileItem) {
         _ui.value = _ui.value.copy(selectedProfileUuid = profile.id)
 
         viewModelScope.launch {
-            settingsStore.savePlayer(profile.name, "", "")
+            settingsStore.setProfile(profile.name)
         }
     }
 
