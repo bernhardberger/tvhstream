@@ -9,7 +9,8 @@ import androidx.media3.common.Tracks
 data class UiTrack(
     val group: Tracks.Group,
     val trackIndexInGroup: Int,
-    val label: String
+    val label: String,
+    val selected: Boolean = false
 )
 
 fun collectTracks(tracks: Tracks, trackType: Int): List<UiTrack> {
@@ -40,7 +41,7 @@ fun collectTracks(tracks: Tracks, trackType: Int): List<UiTrack> {
                 .joinToString(" · ")
                 .ifBlank { "Track ${i + 1}" }
 
-            out += UiTrack(g, i, label)
+            out += UiTrack(g, i, label, g.isTrackSelected(i))
         }
     }
     return out

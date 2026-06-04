@@ -2,8 +2,16 @@ package cz.preclikos.tvhstream.ui.player
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -15,6 +23,29 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import cz.preclikos.tvhstream.R
+
+/**
+ * A single selectable track row. The currently active track is rendered as a
+ * filled button with a check mark so the user can always tell what is selected.
+ */
+@Composable
+private fun TrackOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    if (selected) {
+        Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(label)
+        }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+            Text(label)
+        }
+    }
+}
 
 @Composable
 fun AudioTrackDialog(player: Player, onDismiss: () -> Unit) {
@@ -30,15 +61,14 @@ fun AudioTrackDialog(player: Player, onDismiss: () -> Unit) {
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items.forEach { t ->
-                        OutlinedButton(
+                        TrackOption(
+                            label = t.label,
+                            selected = t.selected,
                             onClick = {
                                 selectAudioTrack(player, t)
                                 onDismiss()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(t.label)
-                        }
+                            }
+                        )
                     }
                 }
             }
@@ -56,6 +86,7 @@ fun AudioTrackDialog(player: Player, onDismiss: () -> Unit) {
 fun SubtitleTrackDialog(player: Player, onDismiss: () -> Unit) {
     val tracks = player.currentTracks
     val items = remember(tracks) { collectTracks(tracks, C.TRACK_TYPE_TEXT) }
+    val anySelected = remember(items) { items.any { it.selected } }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -63,29 +94,27 @@ fun SubtitleTrackDialog(player: Player, onDismiss: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-                OutlinedButton(
+                TrackOption(
+                    label = stringResource(R.string.subtitles_off),
+                    selected = !anySelected,
                     onClick = {
                         selectTextTrack(player, null)
                         onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.subtitles_off))
-                }
+                    }
+                )
 
                 if (items.isEmpty()) {
                     Text(stringResource(R.string.no_subtitles))
                 } else {
                     items.forEach { t ->
-                        OutlinedButton(
+                        TrackOption(
+                            label = t.label,
+                            selected = t.selected,
                             onClick = {
                                 selectTextTrack(player, t)
                                 onDismiss()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(t.label)
-                        }
+                            }
+                        )
                     }
                 }
             }

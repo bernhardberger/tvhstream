@@ -120,8 +120,8 @@ fun OverlayControlsTv(
                         Text(
                             text = summary,
                             color = Color.White.copy(alpha = 0.86f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -135,7 +135,7 @@ fun OverlayControlsTv(
                                 id = R.string.player_ends_in, endsAt
                             ),
                             color = Color.White.copy(alpha = 0.90f),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
@@ -192,7 +192,7 @@ fun OverlayControlsTv(
                         Text(
                             text = text,
                             color = Color.White.copy(alpha = 0.80f),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,

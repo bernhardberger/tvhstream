@@ -2,6 +2,7 @@ package cz.preclikos.tvhstream.player
 
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -60,6 +61,22 @@ class PlayerSession(
         mainScope.launch {
             val p = getOrCreatePlayer(context)
             val settings = playerSettingsStore.playerSettings.first()
+
+            // Apply audio/subtitle language preferences. Subtitles default to OFF
+            // unless the user has configured a preferred subtitle language, so they
+            // no longer turn themselves on without the user asking for them.
+            p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().apply {
+                settings.audioLanguage?.takeIf { it.isNotBlank() }
+                    ?.let { setPreferredAudioLanguage(it) }
+
+                val sub = settings.subtitleLanguage
+                if (sub.isNullOrBlank()) {
+                    setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                } else {
+                    setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    setPreferredTextLanguage(sub)
+                }
+            }.build()
 
             dataSourceFactory = HtspSubscriptionDataSource.Factory(context, htsp, settings.profile)
             val mediaSource = ProgressiveMediaSource.Factory(

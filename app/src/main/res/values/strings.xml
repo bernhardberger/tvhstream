@@ -3,7 +3,7 @@
 
     <string name="channel_list">Channel List</string>
 
-    <string name="player_ends_in">Ends in: %1$s</string>
+    <string name="player_ends_in">Ends at: %1$s</string>
     <string name="player_next_event">Up next: %1$s</string>
     <string name="player_next_event_with_range">Up next: %1$s • %2$s</string>
 

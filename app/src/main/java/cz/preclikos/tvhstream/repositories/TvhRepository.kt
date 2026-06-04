@@ -1,6 +1,7 @@
 package cz.preclikos.tvhstream.repositories
 
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.coverageForEvents
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.htsp.HtspEvent
@@ -9,6 +10,7 @@ import cz.preclikos.tvhstream.htsp.HtspService
 import cz.preclikos.tvhstream.services.StatusService
 import cz.preclikos.tvhstream.services.StatusSlot
 import cz.preclikos.tvhstream.services.UiText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import timber.log.Timber
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -185,6 +188,9 @@ class TvhRepository(
             epgCoverage.clear()
             epgInFlight.clear()
 
+            // Force a fresh warmup for the new connection; coverage was just cleared.
+            warmupCompleted = false
+
             channelsReadyDef = CompletableDeferred()
         }
     }
@@ -214,6 +220,7 @@ class TvhRepository(
             setStatus(UiText.Res(R.string.status_epg_loading), StatusSlot.EPG)
 
             while (isActive) {
+              try {
                 val nowSec = nowSec()
 
                 val targets = stateMutex.withLock {
@@ -262,6 +269,14 @@ class TvhRepository(
                 )
 
                 delay(intervalMs)
+              } catch (ce: CancellationException) {
+                  throw ce
+              } catch (t: Throwable) {
+                  // A single failed iteration (transient request/parse error) must never
+                  // kill the worker, otherwise EPG would silently stop refreshing.
+                  Timber.w(t, "EPG worker iteration failed; backing off")
+                  delay(idleDelayMs)
+              }
             }
         }
     }
@@ -624,15 +639,17 @@ class TvhRepository(
                 .toList()
         }
 
-        // Soft-fix coverage if it drifts too far behind after trimming:
-        // If coveredFrom/To no longer match the retained list, we keep "coveredTo"
-        // as the max of currently stored events so the worker doesn't get confused.
+        // Re-derive coverage from what we actually still hold. Coverage must track
+        // the retained events authoritatively (NOT a monotonic max): otherwise after
+        // a long uptime the horizon can stay "high" while the cache has already been
+        // trimmed empty, so the worker believes it is up to date and stops topping up
+        // -> "No EPG" everywhere until reconnect. Resetting coverage for an emptied
+        // channel makes the worker re-fetch it on the next tick (self-healing).
         for ((chId, flow) in epgByChannel) {
-            val list = flow.value
-            if (list.isEmpty()) continue
             val cov = epgCoverage.getOrPut(chId) { EpgCoverage() }
-            cov.coveredFrom = min(cov.coveredFrom, list.first().start)
-            cov.coveredTo = max(cov.coveredTo, list.last().stop)
+            val derived = coverageForEvents(flow.value)
+            cov.coveredFrom = derived.from
+            cov.coveredTo = derived.to
         }
     }
 

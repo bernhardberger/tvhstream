@@ -1,6 +1,7 @@
 package cz.preclikos.tvhstream.htsp
 
 import cz.preclikos.tvhstream.BuildConfig
+import cz.preclikos.tvhstream.core.ConnectionPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -164,7 +165,7 @@ class HtspService(
                 val user = username?.trim().orEmpty()
                 val pass = password?.trim().orEmpty()
 
-                if (user.isNotEmpty() && pass.isNotEmpty() && challenge != null) {
+                if (ConnectionPolicy.shouldAuthenticate(username, password) && challenge != null) {
                     val digest = makeDigest(pass, challenge!!)
                     val auth = request(
                         method = "authenticate",

@@ -22,6 +22,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "Development"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -86,4 +88,14 @@ dependencies {
 
 
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+
+    // Unit tests (JVM)
+    testImplementation(libs.junit)
+
+    // Instrumented / Compose UI tests (run on a device)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

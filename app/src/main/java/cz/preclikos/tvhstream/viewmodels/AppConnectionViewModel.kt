@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ConnectionPolicy
 import cz.preclikos.tvhstream.htsp.HtspEvent
 import cz.preclikos.tvhstream.htsp.HtspMessage
 import cz.preclikos.tvhstream.htsp.HtspService
@@ -57,7 +58,10 @@ class AppConnectionViewModel(
                 settings.serverSettings,
                 passwords.passwordFlow
             ) { s, pwd -> s to pwd }
-                .filter { (s, pwd) -> s.host.isNotBlank() && s.htspPort != 0 && s.username.isNotBlank() && pwd.isNotBlank() }
+                // Auto-connect as soon as host + port are configured. Username/password
+                // are optional: an unauthenticated TVHeadend is connected with empty
+                // credentials (HtspService.connect skips the auth step when either is blank).
+                .filter { (s, _) -> ConnectionPolicy.isAutoConnectReady(s.host, s.htspPort) }
                 .map { (s, pwd) ->
                     ServerCfg(
                         host = s.host,

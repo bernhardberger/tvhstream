@@ -26,8 +26,7 @@ fun PiconBox(
     piconPath: String?
 ) {
     val piconUrl = remember(serverTag, piconPath) {
-        if (serverTag.isBlank() || piconPath.isNullOrBlank()) null
-        else toHtspPiconUrl(serverTag, piconPath)
+        cz.preclikos.tvhstream.core.resolvePiconModel(serverTag, piconPath)
     }
 
     Box(
@@ -50,7 +49,3 @@ fun PiconBox(
     }
 }
 
-private fun toHtspPiconUrl(serverTag: String, piconPath: String): String {
-    val p = piconPath.trimStart('/')
-    return "htsp-picon://$serverTag/$p"
-}
