@@ -41,6 +41,17 @@ class HtspSubscriptionDataSource private constructor(
     private val jobScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var eventJob: Job? = null
 
+    // ---------- subscriptionStart / muxpkt ordering ----------
+    // The control-event and mux-event flows are collected by two independent
+    // coroutines that both feed the same ring buffer, so without gating a muxpkt
+    // could be framed before its subscriptionStart. The extractor would then have
+    // no StreamReader yet and silently drop it (lost initial key frame -> "one frame
+    // then freeze"). Buffer muxpkts until subscriptionStart has been written, then
+    // flush them in order.
+    private val startGate = Any()
+    private var subscriptionStartWritten = false
+    private val pendingMux = ArrayDeque<HtspMessage>()
+
 
     // ---------- High-performance buffering ----------
     private val lock = ReentrantLock()
@@ -197,11 +208,24 @@ class HtspSubscriptionDataSource private constructor(
                     when (msg.method) {
                         "subscriptionStart" -> {
                             subscriptionStarted = true
+                            // Write the start frame first, then release any muxpkts that
+                            // arrived before it (preserving their original order).
                             writeFramedMessage(msg)
+                            val drained: List<HtspMessage>
+                            synchronized(startGate) {
+                                subscriptionStartWritten = true
+                                drained = pendingMux.toList()
+                                pendingMux.clear()
+                            }
+                            drained.forEach { writeFramedMessage(it) }
                         }
 
                         "subscriptionStop" -> {
                             subscriptionStarted = false
+                            synchronized(startGate) {
+                                subscriptionStartWritten = false
+                                pendingMux.clear()
+                            }
                             lock.lock()
                             try {
                                 notEmpty.signalAll()
@@ -218,7 +242,17 @@ class HtspSubscriptionDataSource private constructor(
                 htspConnection.muxEvents.collect { msg ->
                     val msgSubId = msg.int("subscriptionId")
                     if (msgSubId != null && msgSubId != subscriptionId) return@collect
-                    writeFramedMessage(msg)
+
+                    // If subscriptionStart hasn't been framed yet, hold the muxpkt back
+                    // so the extractor never sees a packet before its stream definition.
+                    val deferred = synchronized(startGate) {
+                        if (!subscriptionStartWritten) {
+                            pendingMux.addLast(msg)
+                            while (pendingMux.size > MAX_PENDING_MUX) pendingMux.removeFirst()
+                            true
+                        } else false
+                    }
+                    if (!deferred) writeFramedMessage(msg)
                 }
             }
         }
@@ -440,5 +474,9 @@ class HtspSubscriptionDataSource private constructor(
         private val subscriptionCount = AtomicInteger()
 
         private const val BUFFER_SIZE = 10 * 1024 * 1024
+
+        // Safety cap on muxpkts buffered while waiting for subscriptionStart (normally
+        // only a handful arrive before it); drop oldest beyond this to bound memory.
+        private const val MAX_PENDING_MUX = 4096
     }
 }

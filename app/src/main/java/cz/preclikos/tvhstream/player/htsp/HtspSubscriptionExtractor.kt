@@ -138,6 +138,7 @@ internal class HtspSubscriptionExtractor : Extractor {
 
     private fun handleSubscriptionStart(message: HtspMessage) {
         Timber.d("Handling Subscription Start")
+        cz.preclikos.tvhstream.player.htsp.reader.StreamDiag.reset()
         val streamReadersFactory = StreamReadersFactory()
 
         for (obj in message.list("streams") ?: emptyList()) {

@@ -104,8 +104,11 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         val payload = message.bin("payload") ?: return
 
         val pts = (message.fields["pts"] as? Number)?.toLong() ?: 0L
+        val dts = (message.fields["dts"] as? Number)?.toLong()
         val frameType = message.int("frametype") ?: -1
         val isKey = (frameType == -1 || frameType == 73) // tvh I-frame
+
+        StreamDiag.onSample("h265", message.int("stream") ?: -1, pts, dts, frameType, payload.size)
 
         if (lastFormatUpdatePts == Long.MIN_VALUE) {
             lastFormatUpdatePts = pts + FORMAT_UPDATE_COOLDOWN_US

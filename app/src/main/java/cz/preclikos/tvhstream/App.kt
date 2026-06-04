@@ -4,10 +4,17 @@ import android.app.Application
 import cz.preclikos.tvhstream.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
+import timber.log.Timber
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // Without a planted tree Timber is a no-op, so debug logging (incl. the
+        // PtsDiag pipeline diagnostics for issue #2) never reaches logcat.
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
 
         startKoin {
             androidContext(this@App)
