@@ -11,7 +11,6 @@ import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.TrackOutput
 import cz.preclikos.tvhstream.htsp.HtspMessage
 import cz.preclikos.tvhstream.player.htsp.utils.TvhMappings
-import timber.log.Timber
 
 @OptIn(UnstableApi::class)
 internal class AacStreamReader : StreamReader {
@@ -26,17 +25,7 @@ internal class AacStreamReader : StreamReader {
 
     override fun consume(message: HtspMessage) {
         val pts = message.long("pts") ?: return
-        val dts = message.long("dts")
         val payload = message.bin("payload") ?: return
-
-        StreamDiag.onSample(
-            kind = "audio",
-            index = message.int("stream") ?: -1,
-            pts = pts,
-            dts = dts,
-            frameType = message.int("frametype") ?: -1,
-            payloadSize = payload.size,
-        )
 
         // TVHeadend ships AAC in ADTS framing. media3/MediaCodec decode AAC as raw
         // access units (RAW transport) using the AudioSpecificConfig (csd-0), so strip
@@ -62,14 +51,6 @@ internal class AacStreamReader : StreamReader {
         val meta = if (stream.fields.contains("meta")) stream.bin("meta") else null
         val initData = meta?.let { listOf(it) }
             ?: listOf(buildAacLcAudioSpecificConfig(rate, channels))
-
-        // Diagnostic (issue #2): record the AAC config so we can tell whether the
-        // decoder's "Invalid AAC stream" (0x1001) is a config / HE-AAC issue.
-        val metaHex = meta?.take(16)?.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
-        Timber.tag("PtsDiag").i(
-            "AAC buildFormat rate=%d channels=%d hasMeta=%b metaHex=[%s]",
-            rate, channels, meta != null, metaHex ?: "none"
-        )
 
         return Format.Builder()
             .setId(streamIndex.toString())

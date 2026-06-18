@@ -93,10 +93,7 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         val payload = message.bin("payload") ?: return
 
         val pts = (message.fields["pts"] as? Number)?.toLong() ?: 0L
-        val dts = (message.fields["dts"] as? Number)?.toLong()
         val frameType = message.int("frametype") ?: -1
-
-        StreamDiag.onSample("h264", message.int("stream") ?: -1, pts, dts, frameType, payload.size)
 
         val isKey = (frameType == -1 || frameType == 73)
 

@@ -10,8 +10,8 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Without a planted tree Timber is a no-op, so debug logging (incl. the
-        // PtsDiag pipeline diagnostics for issue #2) never reaches logcat.
+        // Without a planted tree Timber is a no-op, so debug logging never reaches
+        // logcat. Plant a DebugTree for debug builds only.
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }

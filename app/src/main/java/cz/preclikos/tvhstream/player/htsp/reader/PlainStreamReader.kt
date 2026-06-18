@@ -24,19 +24,8 @@ abstract class PlainStreamReader(private val mTrackType: Int) : StreamReader {
 
     override fun consume(message: HtspMessage) {
         val pts = (message.fields["pts"] as? Number)?.toLong() ?: 0L
-        val dts = (message.fields["dts"] as? Number)?.toLong()
         val frameType = message.int("frametype") ?: -1
         val payload = message.bin("payload")!!
-
-        StreamDiag.onSample(
-            kind = if (mTrackType == C.TRACK_TYPE_VIDEO) "video" else if (mTrackType == C.TRACK_TYPE_AUDIO) "audio" else "other",
-            index = message.int("stream") ?: -1,
-            pts = pts,
-            dts = dts,
-            frameType = frameType,
-            payloadSize = payload.size,
-        )
-
         val pba = ParsableByteArray(payload)
 
         var bufferFlags = 0
