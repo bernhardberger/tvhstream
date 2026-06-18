@@ -50,5 +50,5 @@ packages/
 google-services.json
 
 # Temporary adb screencap files used during local screenshot/debug sessions
-/_shot_probe.png
+/_shot_*.png
 /_stage_*.png

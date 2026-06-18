@@ -11,6 +11,7 @@ import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.TrackOutput
 import cz.preclikos.tvhstream.htsp.HtspMessage
 import cz.preclikos.tvhstream.player.htsp.utils.TvhMappings
+import timber.log.Timber
 
 @OptIn(UnstableApi::class)
 internal class AacStreamReader : StreamReader {
@@ -24,31 +25,33 @@ internal class AacStreamReader : StreamReader {
     }
 
     override fun consume(message: HtspMessage) {
-        val pts = message.long("pts")
-        val payload = message.bin("payload")
-        val pba = ParsableByteArray(payload!!)
+        val pts = message.long("pts") ?: return
+        val dts = message.long("dts")
+        val payload = message.bin("payload") ?: return
 
-        val skipLength: Int = if (hasCrc(payload[1])) {
-            // Have a CRC
-            ADTS_HEADER_SIZE + ADTS_CRC_SIZE
-        } else {
-            // No CRC
-            ADTS_HEADER_SIZE
-        }
+        StreamDiag.onSample(
+            kind = "audio",
+            index = message.int("stream") ?: -1,
+            pts = pts,
+            dts = dts,
+            frameType = message.int("frametype") ?: -1,
+            payloadSize = payload.size,
+        )
 
+        // TVHeadend ships AAC in ADTS framing. media3/MediaCodec decode AAC as raw
+        // access units (RAW transport) using the AudioSpecificConfig (csd-0), so strip
+        // the ADTS header before handing the frame to the decoder.
+        val pba = ParsableByteArray(payload)
+        val skipLength: Int =
+            if (hasCrc(payload[1])) ADTS_HEADER_SIZE + ADTS_CRC_SIZE else ADTS_HEADER_SIZE
         pba.skipBytes(skipLength)
-
         val aacFrameLength = payload.size - skipLength
 
-        // TODO: Set Buffer Flag key frame based on frametype
-        // frametype   u32   required   Type of frame as ASCII value: 'I', 'P', 'B'
         mTrackOutput!!.sampleData(pba, aacFrameLength)
-        mTrackOutput!!.sampleMetadata(pts!!, C.BUFFER_FLAG_KEY_FRAME, aacFrameLength, 0, null)
+        mTrackOutput!!.sampleMetadata(pts, C.BUFFER_FLAG_KEY_FRAME, aacFrameLength, 0, null)
     }
 
     private fun buildFormat(streamIndex: Int, stream: HtspMessage): Format {
-        val initializationData: List<ByteArray>
-
         var rate = Format.NO_VALUE
         if (stream.fields.contains("rate")) {
             rate = TvhMappings.sriToRate(stream.int("rate")!!)
@@ -56,18 +59,24 @@ internal class AacStreamReader : StreamReader {
 
         val channels = stream.int("channels") ?: Format.NO_VALUE
 
-        initializationData = if (stream.fields.contains("meta")) {
-            listOf(stream.bin("meta")!!)
-        } else {
-            listOf(buildAacLcAudioSpecificConfig(rate, channels))
-        }
+        val meta = if (stream.fields.contains("meta")) stream.bin("meta") else null
+        val initData = meta?.let { listOf(it) }
+            ?: listOf(buildAacLcAudioSpecificConfig(rate, channels))
+
+        // Diagnostic (issue #2): record the AAC config so we can tell whether the
+        // decoder's "Invalid AAC stream" (0x1001) is a config / HE-AAC issue.
+        val metaHex = meta?.take(16)?.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+        Timber.tag("PtsDiag").i(
+            "AAC buildFormat rate=%d channels=%d hasMeta=%b metaHex=[%s]",
+            rate, channels, meta != null, metaHex ?: "none"
+        )
 
         return Format.Builder()
             .setId(streamIndex.toString())
             .setSampleMimeType(MimeTypes.AUDIO_AAC)
             .setChannelCount(channels)
             .setSampleRate(rate)
-            .setPcmEncoding(C.ENCODING_PCM_16BIT)
+            .setInitializationData(initData)
             .setSelectionFlags(C.SELECTION_FLAG_AUTOSELECT)
             .setLanguage(stream.str("language") ?: "und")
             .build()
@@ -79,7 +88,6 @@ internal class AacStreamReader : StreamReader {
     }
 
     companion object {
-
         private const val ADTS_HEADER_SIZE = 7
         private const val ADTS_CRC_SIZE = 2
     }

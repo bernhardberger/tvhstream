@@ -160,8 +160,21 @@ internal class HtspSubscriptionExtractor : Extractor {
         mOutput.endTracks()
     }
 
+    private val muxCounts = SparseArray<Int>()
+
     private fun handleMuxpkt(message: HtspMessage) {
         val streamIdx = message.int("stream") ?: return
+
+        // Diagnostic (issue #2): confirm which stream indices actually deliver packets.
+        val n = (muxCounts.get(streamIdx) ?: 0) + 1
+        muxCounts.put(streamIdx, n)
+        if (n <= 3 || n % 250 == 0) {
+            Timber.tag("PtsDiag").i(
+                "muxpkt stream=%d count=%d hasReader=%b",
+                streamIdx, n, mStreamReaders.get(streamIdx) != null
+            )
+        }
+
         val streamReader = mStreamReaders.get(streamIdx) ?: return
         streamReader.consume(message)
     }
