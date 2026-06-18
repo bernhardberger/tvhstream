@@ -43,20 +43,20 @@ class PlayerSession(
     private var watchdogJob: Job? = null
 
     private companion object {
-        // If the player is still BUFFERING with the position not advancing this long
-        // after start, assume a renderer (typically a non-decodable audio track) is
-        // blocking and drop audio so the video can play instead of freezing.
-        const val STUCK_TIMEOUT_MS = 5_000L
+        // If playback is still BUFFERING with the position not advancing this long
+        // after start, a renderer (typically an audio track the hardware decoder can't
+        // actually play) is blocking; drop audio so the video plays instead of freezing.
+        const val STUCK_TIMEOUT_MS = 6_000L
         const val STUCK_POS_MS = 1_000L
     }
 
     @OptIn(UnstableApi::class)
     fun getOrCreatePlayer(context: Context): ExoPlayer {
-        // Prefer the bundled FFmpeg software decoders over the platform decoders.
-        // The platform AAC decoder rejects some IPTV ADTS AAC streams ("Invalid AAC
-        // stream", 0x1001) and substitutes silence; FFmpeg decodes them like VLC does.
+        // Hardware decoders everywhere (MODE_ON). The bundled FFmpeg software decoders
+        // stay available, but we keep playback on the efficient hardware path; if the
+        // hardware decoder can't play a stream the watchdog below recovers the video.
         val renderersFactory = LegacyRenderer(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
         return player ?: ExoPlayer.Builder(context)
             .setRenderersFactory(renderersFactory)
@@ -81,10 +81,8 @@ class PlayerSession(
             val settings = playerSettingsStore.playerSettings.first()
 
             // Apply audio/subtitle language preferences. Subtitles default to OFF
-            // unless the user has configured a preferred subtitle language, so they
-            // no longer turn themselves on without the user asking for them. Audio is
-            // re-enabled here so a previous channel's stuck-audio recovery (below)
-            // doesn't keep audio disabled on the next channel.
+            // unless a subtitle language is configured. Audio is re-enabled here so a
+            // previous channel's stuck-audio recovery doesn't keep audio off.
             p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().apply {
                 setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
 
@@ -115,10 +113,14 @@ class PlayerSession(
     }
 
     /**
-     * Recovery for streams whose audio track never lets the player reach READY (e.g.
-     * an IPTV AAC stream the decoder can't decode): if playback is still stuck
-     * buffering with the position barely moved after [STUCK_TIMEOUT_MS], disable the
-     * audio track so the video renderer can drive playback on its own.
+     * Safety net for a stream whose audio track the hardware decoder can't actually
+     * play (e.g. some IPTV ADTS AAC the platform decoder rejects with 0x1001): the
+     * player then never reaches READY and the first video frame stays frozen. If we're
+     * still stuck buffering with the position barely moved after [STUCK_TIMEOUT_MS],
+     * disable the audio track so the video renderer can drive playback on its own.
+     *
+     * This only fires on a genuine stall — when the hardware decoder plays the audio
+     * fine (the normal case) the watchdog returns without touching anything.
      */
     private fun startStuckAudioWatchdog(p: ExoPlayer) {
         watchdogJob?.cancel()
@@ -129,7 +131,7 @@ class PlayerSession(
                     p.currentPosition < STUCK_POS_MS
             if (stuck) {
                 Timber.w(
-                    "Playback stuck buffering after %d ms (pos=%d); disabling audio track to recover video",
+                    "Playback stuck buffering after %d ms (pos=%d); disabling audio to recover video",
                     STUCK_TIMEOUT_MS, p.currentPosition
                 )
                 p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
