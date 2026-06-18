@@ -52,8 +52,11 @@ class PlayerSession(
 
     @OptIn(UnstableApi::class)
     fun getOrCreatePlayer(context: Context): ExoPlayer {
+        // Prefer the bundled FFmpeg software decoders over the platform decoders.
+        // The platform AAC decoder rejects some IPTV ADTS AAC streams ("Invalid AAC
+        // stream", 0x1001) and substitutes silence; FFmpeg decodes them like VLC does.
         val renderersFactory = LegacyRenderer(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         return player ?: ExoPlayer.Builder(context)
             .setRenderersFactory(renderersFactory)
