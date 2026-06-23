@@ -52,9 +52,12 @@ class PlayerSession(
 
     @OptIn(UnstableApi::class)
     fun getOrCreatePlayer(context: Context): ExoPlayer {
-        // Hardware decoders everywhere (MODE_ON). The bundled FFmpeg software decoders
-        // stay available, but we keep playback on the efficient hardware path; if the
-        // hardware decoder can't play a stream the watchdog below recovers the video.
+        // Hardware decoders everywhere (MODE_ON) so AAC keeps its 5.1 channels and
+        // AC3/EAC3 can still pass through to an AVR. The one exception is MPEG-1/2 audio
+        // (MP1/MP2): the Amlogic platform decoder advertises support but fails valid
+        // DVB/IPTV frames with "Invalid data frame", and never falls back. LegacyRenderer
+        // hides that decoder via a MediaCodecSelector so only MP1/MP2 drop to the bundled
+        // FFmpeg software decoder; everything else stays on hardware.
         val renderersFactory = LegacyRenderer(context)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
