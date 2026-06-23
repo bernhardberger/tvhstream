@@ -8,6 +8,14 @@ on:
       - "v*.*.*"
   workflow_dispatch:
 
+# Pushing a release tags both the tag (v*) and the release/* branch at once, so two
+# deploy runs would otherwise hit the same Google Play app concurrently and invalidate
+# each other's edit session ("This edit has expired"). Serialize all Play deploys so
+# each run owns its edit; queue rather than cancel so both tracks still get deployed.
+concurrency:
+  group: google-play-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
