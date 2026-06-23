@@ -82,6 +82,14 @@ jobs:
 
           echo "RELEASE_TRACK=${TRACK}" >> "$GITHUB_ENV"
 
+      # fastlane is dropping Ruby < 3.3; the runner's default Ruby (3.2.3) triggered a
+      # deprecation warning. Pin Ruby 3.3 so fastlane stays supported. setup-ruby also
+      # puts the gem bin dir on PATH, so the old hardcoded ruby/3.2.0 PATH hack is gone.
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
       - name: Upload to Play (Fastlane)
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/upload.jks
@@ -92,6 +100,5 @@ jobs:
           RELEASE_TRACK: ${{ env.RELEASE_TRACK }}
           VERSION_NAME: ${{ env.VERSION_NAME }}
         run: |
-          gem install fastlane -N --user-install
-          echo "$HOME/.local/share/gem/ruby/3.2.0/bin" >> $GITHUB_PATH
+          gem install fastlane
           fastlane android deploy
