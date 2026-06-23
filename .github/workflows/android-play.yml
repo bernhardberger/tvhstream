@@ -4,14 +4,11 @@ on:
   push:
     branches:
       - "release/**"
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
 
-# Pushing a release tags both the tag (v*) and the release/* branch at once, so two
-# deploy runs would otherwise hit the same Google Play app concurrently and invalidate
-# each other's edit session ("This edit has expired"). Serialize all Play deploys so
-# each run owns its edit; queue rather than cancel so both tracks still get deployed.
+# Serialize Play deploys so concurrent runs never hit the same Google Play app at once
+# and invalidate each other's edit session ("This edit has expired"). Queue rather than
+# cancel so every triggered deploy still runs.
 concurrency:
   group: google-play-deploy
   cancel-in-progress: false
@@ -49,20 +46,18 @@ jobs:
         run: |
           set -euo pipefail
           
-          # 1. Základní nastavení
+          # 1. Track podle kontextu. Nasazujeme jen do closed testingu (track "alpha"):
+          #    release/* -> alpha (closed testing). Produkce se z CI záměrně nenasazuje.
           TRACK="internal"
           VERSION_NAME_TO_SET=""
-          
+
           # 2. Rozlišení kontextu podle GITHUB_REF
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            TRACK="production"
-            VERSION_NAME_TO_SET=${GITHUB_REF#refs/tags/v}
-          elif [[ "${GITHUB_REF}" == refs/heads/release/* ]]; then
+          if [[ "${GITHUB_REF}" == refs/heads/release/* ]]; then
             TRACK="alpha"
             VERSION_NAME_TO_SET=${GITHUB_REF#refs/heads/release/}
           else
+            # workflow_dispatch mimo release/* -> internal testing, versionName necháme být
             TRACK="internal"
-            # Pro master nenasazujeme novou verzi, jen ji můžeme přečíst nebo nechat být
           fi
 
           # 3. Výpočet versionCode (vždy unikátní pro Play Store)
