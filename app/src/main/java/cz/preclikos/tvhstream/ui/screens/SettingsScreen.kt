@@ -18,11 +18,13 @@ import cz.preclikos.tvhstream.ui.components.SettingsSubRail
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsAppliance
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsConnection
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsLanguage
+import cz.preclikos.tvhstream.ui.screens.settings.SettingsOptions
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsPlayer
 
 object SettingsRoutes {
     const val GENERAL = "settings/general"
     const val PLAYER = "settings/player"
+    const val OPTIONS = "settings/options"
     const val CONNECTION = "settings/connection"
     const val APPLIANCE = "settings/appliance"
     const val ABOUT = "settings/about"
@@ -68,6 +70,10 @@ fun SettingsScreen(onClose: () -> Unit) {
 
                     composable(SettingsRoutes.CONNECTION) {
                         SettingsConnection()
+                    }
+
+                    composable(SettingsRoutes.OPTIONS) {
+                        SettingsOptions()
                     }
 
                     composable(SettingsRoutes.PLAYER) {

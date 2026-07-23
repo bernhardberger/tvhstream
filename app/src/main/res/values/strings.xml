@@ -26,6 +26,8 @@
     <!-- Settings screen -->
     <string name="settings_server">Settings - Connection</string>
     <string name="settings_language">Settings - Language</string>
+    <string name="settings_options">Settings - Options</string>
+    <string name="show_epg_menu">Show EPG in main menu</string>
     <string name="language_follow_system">Follow system</string>
     <string name="language_german">German</string>
     <string name="language_english">English</string>

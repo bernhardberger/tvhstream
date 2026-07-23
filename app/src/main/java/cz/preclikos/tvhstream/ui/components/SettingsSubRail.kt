@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,12 +61,16 @@ fun SettingsSubRail(
 
     val languageLabel = stringResource(R.string.navigation_language)
     val connectionLabel = stringResource(R.string.navigation_connection)
+    val optionsLabel = stringResource(R.string.options)
     val playerLabel = stringResource(R.string.navigation_player)
     val applianceLabel = stringResource(R.string.navigation_appliance)
-    val items = remember(languageLabel, connectionLabel, playerLabel, applianceLabel) {
+    val items = remember(languageLabel, optionsLabel, connectionLabel, playerLabel, applianceLabel) {
         listOf(
             RailItem(SettingsRoutes.GENERAL, languageLabel) {
                 Icon(Icons.Filled.Language, null, tint = Color.White)
+            },
+            RailItem(SettingsRoutes.OPTIONS, optionsLabel) {
+                Icon(Icons.Filled.Tune, null, tint = Color.White)
             },
             RailItem(SettingsRoutes.CONNECTION, connectionLabel) {
                 Icon(Icons.AutoMirrored.Filled.List, null, tint = Color.White)

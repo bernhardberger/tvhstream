@@ -255,6 +255,8 @@ modify TVHeadend accounts, channels, profiles, tuners, or other server state.
   Back navigation, and HOME remains available for deliberate app exit.
 - Settings is isolated at the bottom of the main rail and opens on Language;
   connection credentials require an explicit second navigation choice.
+- An Options page can hide or show the main-menu EPG entry; it defaults to shown
+  and does not disable EPG data used elsewhere.
 - The playback controls do not initially focus Stop or another action, while all
   existing player controls remain available.
 

@@ -24,6 +24,8 @@
     <!-- Settings screen -->
     <string name="settings_server">Nastavení – Připojení</string>
     <string name="settings_language">Nastavení – Jazyk</string>
+    <string name="settings_options">Nastavení – Možnosti</string>
+    <string name="show_epg_menu">Zobrazit program v hlavní nabídce</string>
     <string name="language_follow_system">Podle systému</string>
     <string name="language_german">Němčina</string>
     <string name="language_english">Angličtina</string>

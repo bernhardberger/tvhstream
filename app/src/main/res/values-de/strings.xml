@@ -22,6 +22,8 @@
 
     <string name="settings_server">Einstellungen – Verbindung</string>
     <string name="settings_language">Einstellungen – Sprache</string>
+    <string name="settings_options">Einstellungen – Optionen</string>
+    <string name="show_epg_menu">Programm im Hauptmenü anzeigen</string>
     <string name="language_follow_system">Systemsprache verwenden</string>
     <string name="language_german">Deutsch</string>
     <string name="language_english">Englisch</string>

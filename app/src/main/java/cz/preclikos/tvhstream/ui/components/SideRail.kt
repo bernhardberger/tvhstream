@@ -53,6 +53,7 @@ import cz.preclikos.tvhstream.ui.Routes
 @Composable
 fun SideRail(
     currentRoute: String?,
+    showEpgMenu: Boolean,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
     railFocusRequester: FocusRequester = remember { FocusRequester() },
@@ -69,17 +70,23 @@ fun SideRail(
     val channelsLabel = stringResource(R.string.navigation_channels)
     val epgLabel = stringResource(R.string.navigation_epg)
     val settingsLabel = stringResource(R.string.navigation_settings)
-    val primaryItems = remember(channelsLabel, epgLabel) {
-        listOf(
-            RailItem(Routes.CHANNELS, channelsLabel) {
-                Icon(
-                    Icons.AutoMirrored.Filled.List,
-                    null,
-                    tint = Color.White
-                )
-            },
-            RailItem(Routes.EPG, epgLabel) { Icon(Icons.Filled.Event, null, tint = Color.White) },
-        )
+    val primaryItems = remember(channelsLabel, epgLabel, showEpgMenu) {
+        buildList {
+            add(
+                RailItem(Routes.CHANNELS, channelsLabel) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.List,
+                        null,
+                        tint = Color.White
+                    )
+                }
+            )
+            if (showEpgMenu) {
+                add(RailItem(Routes.EPG, epgLabel) {
+                    Icon(Icons.Filled.Event, null, tint = Color.White)
+                })
+            }
+        }
     }
     val settingsItem = remember(settingsLabel) {
         RailItem(Routes.SETTINGS, settingsLabel) {

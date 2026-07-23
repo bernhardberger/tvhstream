@@ -21,6 +21,8 @@ backs out to those screens.
 
 The operator UI is available in English, German, and Czech. Its in-app language
 setting lists system default and all three supported languages.
+The operator can hide the EPG entry from the main menu without disabling EPG
+data used by channel and playback details.
 
 ## Tech stack
 
@@ -121,7 +123,7 @@ fun adjacentChannelId(
 ## Success criteria
 
 1. The Leoville package installs and runs on the TCL's 32-bit `armeabi-v7a`
-   Android TV 12 environment.
+   Android TV 14 environment.
 2. Interlaced-channel playback remains at least as good as the accepted
    TVHStream diagnostic result.
 3. Physical `CH+` and `CH-` switch to adjacent visible channels and wrap at the
@@ -153,6 +155,8 @@ fun adjacentChannelId(
     localized, non-technical status instead of an empty or indefinitely black
     screen; the full channel, EPG, and settings UI remains available through
     Back.
+14. Options can hide or show the main-menu EPG entry, defaulting to shown for
+    existing and fresh installations without removing EPG details elsewhere.
 
 ## Open questions
 

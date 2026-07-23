@@ -24,6 +24,8 @@ import androidx.navigation.navArgument
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ApplianceLaunchRequests
 import cz.preclikos.tvhstream.htsp.ConnectionState
+import cz.preclikos.tvhstream.settings.UiSettings
+import cz.preclikos.tvhstream.settings.UiSettingsStore
 import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.ui.components.ContentContainer
 import cz.preclikos.tvhstream.ui.components.InfoBanner
@@ -61,6 +63,8 @@ fun AppRoot(
     val connectionState by appVm.connectionState.collectAsState()
     val channelsVm: ChannelsViewModel = koinViewModel()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
+    val uiSettingsStore: UiSettingsStore = koinInject()
+    val uiSettings by uiSettingsStore.settings.collectAsState(initial = UiSettings())
     val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsState()
 
     val backStackEntry by nav.currentBackStackEntryAsState()
@@ -115,6 +119,7 @@ fun AppRoot(
             if (showRail) {
                 SideRail(
                     currentRoute = topRoute,
+                    showEpgMenu = uiSettings.showEpgMenu,
                     onNavigate = { route ->
                         val current = nav.currentBackStackEntry?.destination?.route
                         if (current == route) {
