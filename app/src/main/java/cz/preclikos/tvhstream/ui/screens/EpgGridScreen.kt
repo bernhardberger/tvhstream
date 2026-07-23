@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.repositories.TvhRepository
@@ -82,6 +83,8 @@ fun EpgGridScreen(
 ) {
     val selectedId by selection.selectedId.collectAsState()
     val channels by channelViewModel.channels.collectAsState()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
     
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
@@ -220,6 +223,11 @@ fun EpgGridScreen(
                     EpgGridRow(
                         modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
                         channel = ch,
+                        channelNumber = ChannelNavigation.numberForId(
+                            orderedChannelIds,
+                            channelNumbers,
+                            ch.id,
+                        ),
                         selected = isSelected,
                         epg = epg,
                         nowSec = nowSec,
@@ -297,6 +305,7 @@ private fun TimeHeaderRow(
 private fun EpgGridRow(
     modifier: Modifier = Modifier,
     channel: ChannelUi,
+    channelNumber: Int?,
     selected: Boolean,
     epg: List<EpgEventEntry>,
     nowSec: Long,
@@ -370,6 +379,7 @@ private fun EpgGridRow(
         
         ChannelNameCell(
             channel = channel,
+            channelNumber = channelNumber,
             selected = selected,
             focused = focused,
             width = channelColWidth
@@ -393,6 +403,7 @@ private fun EpgGridRow(
 @Composable
 private fun ChannelNameCell(
     channel: ChannelUi,
+    channelNumber: Int?,
     selected: Boolean,
     focused: Boolean,
     width: Dp
@@ -412,13 +423,24 @@ private fun ChannelNameCell(
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Text(
-            text = channel.name,
-            style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (channelNumber != null) {
+                Text(
+                    text = channelNumber.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(40.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = channel.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

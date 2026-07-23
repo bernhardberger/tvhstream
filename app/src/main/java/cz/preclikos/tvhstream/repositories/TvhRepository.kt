@@ -462,7 +462,7 @@ class TvhRepository(
     }
 
     private fun publishChannelsLocked(channels: List<ChannelMetadata>) {
-        _channelsUi.value = channels.map { ChannelUi(it.id, it.name, it.icon) }
+        _channelsUi.value = channels.map { ChannelUi(it.id, it.name, it.number, it.icon) }
     }
 
     // ---------------------------

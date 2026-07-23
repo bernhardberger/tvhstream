@@ -46,6 +46,13 @@
     <string name="open_accessibility_settings">Otevřít nastavení přístupnosti</string>
     <string name="appliance_accessibility_service_label">Spouštění Leoville TV</string>
     <string name="appliance_accessibility_service_description">Otevírá Leoville TV při spuštění a probuzení a mapuje pouze tlačítko TV/PROGRAM. Nemůže číst obsah obrazovky.</string>
+    <string name="appliance_starting_tv">Spouštím televizi…</string>
+    <string name="appliance_connection_recovering">Televize momentálně není dostupná. Připojení se automaticky obnovuje…</string>
+    <string name="appliance_back_for_menu">Tlačítko Zpět otevře kanály a nastavení.</string>
+
+    <string name="player_starting_channel">Spouštím kanál…</string>
+    <string name="player_connection_recovering">Připojení bylo přerušeno. Automaticky se obnovuje…</string>
+    <string name="player_playback_recovering">Přehrávání bylo přerušeno. Automaticky to zkouším znovu…</string>
 
     <string name="loading_wait">Načítání čeká…</string>
     <string name="not_connected">Nepřipojeno</string>
@@ -100,4 +107,9 @@
 
     <string name="status_channels_ready">Kanály připraveny: %1$d</string>
     <string name="status_syncing_channels">Načítám kanály\u2026 %1$d</string>
+    <string name="status_connecting">Připojuji…</string>
+    <string name="status_connected">Připojeno</string>
+    <string name="status_syncing">Načítám kanály…</string>
+    <string name="status_connection_lost">Připojení bylo přerušeno. Připojuji znovu…</string>
+    <string name="status_connection_retrying">Televizní připojení není dostupné. Zkouším znovu…</string>
 </resources>

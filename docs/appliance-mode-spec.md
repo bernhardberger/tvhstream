@@ -11,6 +11,10 @@ channel and number buttons, reclaim TCL's globally intercepted TV/GUIDE button,
 and enter live TV after boot or display wake through a narrowly scoped
 accessibility service.
 
+The client must preserve TVHeadend's channel numbers rather than inventing new
+numbers from list positions. It must also recover automatically from temporary
+connection and playback failures without changing TVHeadend configuration.
+
 The upstream-shaped channel list, EPG, and settings remain available as an
 operator path. The app must not immediately restart playback after the user
 backs out to those screens.
@@ -72,13 +76,15 @@ fun adjacentChannelId(
 ## Testing strategy
 
 - Unit-test channel navigation, wrapping, number entry, and launch-policy
-  decisions.
+  decisions, including sparse TVHeadend channel numbers and retry backoff.
 - Run the complete existing JVM unit-test suite and build the APK.
 - Install beside both stock Headent and the temporary upstream-package
   TVHStream diagnostic build.
 - Runtime-test progressive and interlaced playback, `CH+`, `CH-`, 1- to 3-digit
   channel entry, persistence across force-stop, normal Back navigation, HOME
   launch, GUIDE/TV key, standby/wake, and a cold reboot.
+- Fault-test launch while TVHeadend is unavailable, connection restoration,
+  unexpected playback end/error, and a stream that remains stuck buffering.
 - Treat visible motion quality on an interlaced sports broadcast as a mandatory
   human verification gate.
 
@@ -90,6 +96,8 @@ fun adjacentChannelId(
 - Preserve a route to channel list, EPG, and settings through Back navigation.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
 - Use a distinct Leoville application ID and stable signing key.
+- Keep channel ordering, numbering, and playback recovery in the client; do not
+  require TVHeadend configuration changes for appliance behavior.
 - Consume only Android GUIDE and the captured TCL TV key code in the
   accessibility service; boot/wake entry must not subscribe to accessibility
   events or inspect window content.
@@ -117,12 +125,16 @@ fun adjacentChannelId(
 3. Physical `CH+` and `CH-` switch to adjacent visible channels and wrap at the
    ends of the list.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
-   visible channel after 1 to 3 digits.
+   TVHeadend channel number after 1 to 3 digits. A server that supplies no
+   channel numbers falls back to one-based visible-list positions.
 5. The last successfully selected channel survives process death and reboot.
 6. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
    and channel data, then plays the persisted channel or the first channel. If
    playback is already visible, the entry intent must not restart it.
 7. Back exits playback to the normal TVHStream UI without an autoplay loop.
+   Back during a pending offline appliance launch cancels that request and
+   exposes the normal operator UI; Back at the channel-list root does not kill
+   the app process.
 8. The accessibility service ignores every key except Android GUIDE and the
    captured TCL TV key code, does not subscribe to accessibility events or
    window content, and does not interfere with keys while disabled.
@@ -132,6 +144,13 @@ fun adjacentChannelId(
     installed package/signature/version details are recorded without secrets.
 11. The operator can switch between system language, German, English, and Czech
     in the app, and the choice persists across relaunches.
+12. Connection loss, Media3 playback error, unexpected stream end, and a
+    persistent initial buffering stall recover automatically with bounded
+    retry backoff. Explicitly leaving playback cancels all pending retries.
+13. While startup or playback is recovering, the app shows a persistent,
+    localized, non-technical status instead of an empty or indefinitely black
+    screen; the full channel, EPG, and settings UI remains available through
+    Back.
 
 ## Open questions
 

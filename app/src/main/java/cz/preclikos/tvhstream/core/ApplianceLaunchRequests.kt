@@ -31,4 +31,7 @@ class ApplianceLaunchRequests {
 
     fun consume(request: ApplianceLaunchRequest): Boolean =
         _pending.compareAndSet(request, null)
+
+    fun cancel(request: ApplianceLaunchRequest): Boolean =
+        _pending.compareAndSet(request, null)
 }

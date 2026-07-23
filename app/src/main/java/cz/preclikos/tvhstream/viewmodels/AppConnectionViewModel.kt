@@ -35,6 +35,7 @@ class AppConnectionViewModel(
 ) : ViewModel() {
 
     val status = statusService.headline
+    val connectionState = htsp.state
 
     private data class ServerCfg(
         val host: String,
@@ -83,7 +84,7 @@ class AppConnectionViewModel(
                     is HtspEvent.ConnectionError -> {
                         statusService.set(
                             StatusSlot.CONNECTION,
-                            UiText.Plain("Disconnected. Reconnecting…")
+                            UiText.Res(R.string.status_connection_lost)
                         )
                         repo.onDisconnected()
                         startOrRestartReconnectLoop()
@@ -178,7 +179,10 @@ class AppConnectionViewModel(
                 )
                 if (ok) return@launch
 
-                statusService.set(StatusSlot.CONNECTION, UiText.Plain("Reconnect in 5s…"))
+                statusService.set(
+                    StatusSlot.CONNECTION,
+                    UiText.Res(R.string.status_connection_retrying)
+                )
                 delay(5_000)
             }
         }
@@ -205,7 +209,7 @@ class AppConnectionViewModel(
         return try {
             statusService.set(StatusSlot.SYNC, null)
             statusService.set(StatusSlot.EPG, null)
-            statusService.set(StatusSlot.CONNECTION, UiText.Plain("Connecting to $host:$port"))
+            statusService.set(StatusSlot.CONNECTION, UiText.Res(R.string.status_connecting))
 
             repo.onNewConnectionStarting()
 
@@ -218,9 +222,9 @@ class AppConnectionViewModel(
                 connectTimeoutMs = 10_000,
                 responseTimeoutMs = 5_000
             )
-            statusService.set(StatusSlot.CONNECTION, UiText.Plain("Connected"))
+            statusService.set(StatusSlot.CONNECTION, UiText.Res(R.string.status_connected))
 
-            statusService.set(StatusSlot.SYNC, UiText.Plain("Syncing…"))
+            statusService.set(StatusSlot.SYNC, UiText.Res(R.string.status_syncing))
             htsp.enableAsyncMetadataAndWaitInitialSync()
 
             repo.awaitChannelsReady()
@@ -231,7 +235,7 @@ class AppConnectionViewModel(
             Timber.e(e, "Connect failed")
             statusService.set(
                 StatusSlot.CONNECTION,
-                UiText.Plain("Connection failed: ${e.message ?: e}")
+                UiText.Res(R.string.status_connection_retrying)
             )
             false
         }

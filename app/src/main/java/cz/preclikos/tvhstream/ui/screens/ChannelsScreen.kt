@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.ui.common.formatHm
@@ -63,6 +64,8 @@ fun ChannelsScreen(
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
     val channels by channelViewModel.channels.collectAsState()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
     val selectedId by selection.selectedId.collectAsState()
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
@@ -150,7 +153,7 @@ fun ChannelsScreen(
                         .focusGroup()
                         .focusRestorer()
                 ) {
-                    itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
+                    items(channels, key = { ch -> ch.id }) { ch ->
                         val isSelected = ch.id == selectedId
                         val now =
                             remember(ch.id, nowSec) { channelViewModel.nowEvent(ch.id, nowSec) }
@@ -158,7 +161,11 @@ fun ChannelsScreen(
 
                         ChannelRow(
                             modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
-                            number = index + 1,
+                            number = ChannelNavigation.numberForId(
+                                orderedChannelIds,
+                                channelNumbers,
+                                ch.id,
+                            ),
                             name = ch.name,
                             programTitle = now?.title ?: stringResource(R.string.no_epg),
                             progress = if (now != null) prog else null,

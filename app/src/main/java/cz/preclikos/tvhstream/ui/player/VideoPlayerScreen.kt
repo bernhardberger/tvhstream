@@ -39,6 +39,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -49,6 +50,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil3.ImageLoader
+import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.ConnectionState
@@ -57,9 +59,11 @@ import cz.preclikos.tvhstream.settings.PlayerSettings
 import cz.preclikos.tvhstream.settings.PlayerSettingsStore
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
+import cz.preclikos.tvhstream.player.PlaybackSessionState
 import cz.preclikos.tvhstream.ui.common.nextAfter
 import cz.preclikos.tvhstream.ui.common.nowEvent
 import cz.preclikos.tvhstream.ui.components.KeepScreenOn
+import cz.preclikos.tvhstream.ui.components.TvRecoveryOverlay
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import cz.preclikos.tvhstream.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.delay
@@ -105,7 +109,10 @@ fun VideoPlayerScreen(
     )
 
     val connState by videoPlayerViewModel.connectionState.collectAsState()
+    val playbackState by videoPlayerViewModel.playbackState.collectAsState()
     val channels by channelsVm.channels.collectAsState()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
     val selectedInitId by selection.selectedId.collectAsState()
     var selectedId by remember { mutableIntStateOf(selectedInitId) }
 
@@ -191,7 +198,7 @@ fun VideoPlayerScreen(
 
     fun tuneAdjacentChannel(direction: Int): Boolean {
         val adjacentId = ChannelNavigation.adjacentId(
-            orderedIds = channels.map { it.id },
+            orderedIds = orderedChannelIds,
             currentId = currentChannelId,
             direction = direction,
         ) ?: return false
@@ -204,7 +211,8 @@ fun VideoPlayerScreen(
         if (channelNumberInput.isEmpty()) return false
 
         val channelId = ChannelNavigation.idForNumber(
-            orderedIds = channels.map { it.id },
+            orderedIds = orderedChannelIds,
+            channelNumbers = channelNumbers,
             enteredNumber = channelNumberInput,
         )
         channelNumberInput = ""
@@ -247,8 +255,16 @@ fun VideoPlayerScreen(
         channels.firstOrNull { it.id == currentChannelId }
     }
     val currentChannelNumber = remember(channels, currentChannelId) {
-        ChannelNavigation.numberForId(channels.map { it.id }, currentChannelId)
+        ChannelNavigation.numberForId(
+            orderedChannelIds,
+            channelNumbers,
+            currentChannelId,
+        )
     }
+    val recoveryVisible = screenActive && (
+        connState !is ConnectionState.Connected ||
+            playbackState !is PlaybackSessionState.Playing
+        )
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) drawerOpen = false
@@ -315,6 +331,20 @@ fun VideoPlayerScreen(
                         }
 
                         else -> false
+                    }
+                }
+
+                if (recoveryVisible) {
+                    when (event.key) {
+                        Key.Enter,
+                        Key.NumPadEnter,
+                        Key.DirectionCenter,
+                        Key.DirectionLeft,
+                        Key.DirectionRight,
+                        Key.DirectionUp,
+                        Key.DirectionDown -> return@onPreviewKeyEvent true
+
+                        else -> Unit
                     }
                 }
 
@@ -467,5 +497,17 @@ fun VideoPlayerScreen(
                 )
             }
         }
+
+        TvRecoveryOverlay(
+            visible = recoveryVisible,
+            message = stringResource(
+                when {
+                    connState !is ConnectionState.Connected -> R.string.player_connection_recovering
+                    playbackState is PlaybackSessionState.Recovering -> R.string.player_playback_recovering
+                    else -> R.string.player_starting_channel
+                }
+            ),
+            opaque = false,
+        )
     }
 }

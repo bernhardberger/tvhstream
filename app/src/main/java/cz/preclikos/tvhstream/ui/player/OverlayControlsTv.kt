@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -72,7 +71,7 @@ fun OverlayControlsTv(
     var showAudio by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
 
-    var lastFocused by rememberSaveable { mutableIntStateOf(0) }
+    var lastFocused by rememberSaveable { mutableStateOf<Int?>(null) }
 
     val stopFR = remember { FocusRequester() }
     val audioFR = remember { FocusRequester() }
@@ -82,7 +81,7 @@ fun OverlayControlsTv(
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
-            focusRequesters.getOrNull(lastFocused)?.requestFocus()
+            lastFocused?.let { focusRequesters.getOrNull(it)?.requestFocus() }
         }
     }
 
@@ -135,10 +134,6 @@ fun OverlayControlsTv(
                                 text = channelNumber.toString(),
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier
-                                    .clip(MaterialTheme.shapes.small)
-                                    .background(Color.White.copy(alpha = 0.16f))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp),
                             )
                             Spacer(Modifier.width(8.dp))
                         }

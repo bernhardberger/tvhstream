@@ -26,6 +26,12 @@
 - Use AndroidX per-app locales for the operator UI. The empty locale list follows
   the device language, while explicit English, German, and Czech choices persist
   through the platform-compatible locale store.
+- Preserve TVHeadend `channelNumber` metadata through the client model and use
+  it for display and direct entry. Fall back to list positions only when the
+  server supplies no channel numbers at all.
+- Recover the existing Media3 session from player errors, unexpected stream end,
+  and persistent initial buffering with bounded retry backoff. Recovery releases
+  the failed HTSP subscription first and never changes the extractor or decoder.
 
 ## Phase 1: Reproducible private build identity
 
@@ -78,14 +84,14 @@ aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 
 ### Task 3a: Add direct channel-number entry
 
-**Status:** Implemented and verified on the TCL on 2026-07-23.
+**Status:** Implemented; revised TVHeadend-number handling needs TCL revalidation.
 
 **Acceptance criteria:**
 
 - Top-row and numpad `0`-`9` key codes build a visible 1- to 3-digit overlay
   during playback.
-- Entered numbers select the matching 1-based channel shown in the ordered
-  channel list.
+- Entered numbers select the matching TVHeadend channel number; if no channels
+  have server numbers, they select the matching 1-based ordered-list position.
 - One- and two-digit entries tune after 1.5 seconds or immediately on OK; a
   complete three-digit entry remains visible briefly before tuning.
 - Back cancels pending entry, and invalid or out-of-range numbers do not change
@@ -103,6 +109,8 @@ aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 - Progressive ORF1 and interlaced ServusTV still play.
 - Physical channel buttons work repeatedly.
 - Numeric entry visibly accepts and tunes 1-, 2-, and 3-digit channel numbers.
+- Displayed and entered numbers match TVHeadend numbers, including numbering
+  gaps.
 
 ## Phase 3: Appliance entry
 
@@ -226,6 +234,37 @@ localized navigation labels.
 
 **Dependencies:** None.
 
+### Task 6b: Add resilient client-side TV operation
+
+**Status:** Implemented locally; device fault validation pending.
+
+This is a TVHeadend-integration and appliance-shell change only. It does not
+modify TVHeadend accounts, channels, profiles, tuners, or other server state.
+
+**Acceptance criteria:**
+
+- Channel list, EPG, player overlay, and number entry use TVHeadend channel
+  numbers, with list-position fallback only for an entirely unnumbered server.
+- Appliance startup shows a persistent localized recovery screen until channels
+  arrive; Back cancels the pending autoplay request and exposes the complete UI.
+- Media3 error, unexpected end, or persistent initial buffering retries the same
+  service with bounded 1/2/5/10/30-second backoff.
+- A retry releases its failed HTSP subscription, successful playback resets the
+  backoff, and explicit playback exit cancels pending recovery.
+- Normal root Back does not call `exitProcess`; EPG and settings retain useful
+  Back navigation, and HOME remains available for deliberate app exit.
+- The playback controls do not initially focus Stop or another action, while all
+  existing player controls remain available.
+
+**Verification:** JVM policy tests, full debug build, startup with TVHeadend
+temporarily unavailable, playback interruption/restoration, root/settings Back,
+real sparse channel numbers, and progressive/interlaced playback on the TCL.
+
+**Files:** channel model/navigation/UI, player session, connection status UI,
+localized strings, and policy tests.
+
+**Dependencies:** Tasks 3a, 4, and 6a.
+
 ### Task 7: Sign and install the release build
 
 **Acceptance criteria:**
@@ -239,7 +278,7 @@ localized navigation labels.
 and complete TCL runtime matrix.
 
 **Files:** non-secret signing configuration support and deployment docs.  
-**Dependencies:** Tasks 1-6.
+**Dependencies:** Tasks 1-6b.
 
 ## Risks and mitigations
 
@@ -251,6 +290,8 @@ and complete TCL runtime matrix.
 | Persisted channel disappears | Medium | Validate against current channel IDs and fall back to first channel |
 | Channel synchronization exposes partial lists | High | Lossless control delivery and atomic initial publication are implemented with JVM regressions; recheck a stable count across reconnects on the TCL |
 | Media3 playback regresses | High | Do not alter extractor/rendering code; replay progressive and interlaced channels at each checkpoint |
+| Temporary stream failure leaves a black screen | High | Retry the same service with bounded backoff, release failed subscriptions, show persistent recovery state, and cancel on explicit exit |
+| Sparse TVHeadend numbers tune the wrong channel | High | Carry server channel numbers through the UI and unit-test gaps plus unnumbered-server fallback |
 | Fork diverges from upstream | Medium | Keep appliance changes narrow and maintain the upstream remote |
 
 ## Final checkpoint

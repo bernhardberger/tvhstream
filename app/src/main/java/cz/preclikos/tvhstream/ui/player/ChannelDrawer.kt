@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.ui.common.progress
 import cz.preclikos.tvhstream.ui.components.ChannelRow
@@ -54,6 +55,8 @@ fun ChannelDrawer(
     onCloseDrawer: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
@@ -111,7 +114,7 @@ fun ChannelDrawer(
                 .focusGroup()
                 .focusRestorer()
         ) {
-            itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
+            items(channels, key = { ch -> ch.id }) { ch ->
                 val isSelected = ch.id == selectedId
 
                 val now = remember(ch.id, nowSec) { channelsVm.nowEvent(ch.id, nowSec) }
@@ -119,7 +122,11 @@ fun ChannelDrawer(
 
                 ChannelRow(
                     modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
-                    number = index + 1,
+                    number = ChannelNavigation.numberForId(
+                        orderedChannelIds,
+                        channelNumbers,
+                        ch.id,
+                    ),
                     name = ch.name,
                     programTitle = now?.title ?: stringResource(R.string.no_epg),
                     progress = if (now != null) prog else null,

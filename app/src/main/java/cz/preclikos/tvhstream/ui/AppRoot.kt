@@ -1,6 +1,5 @@
 package cz.preclikos.tvhstream.ui
 
-import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -15,18 +14,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ApplianceLaunchRequests
+import cz.preclikos.tvhstream.htsp.ConnectionState
 import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.ui.components.ContentContainer
 import cz.preclikos.tvhstream.ui.components.InfoBanner
 import cz.preclikos.tvhstream.ui.components.SideRail
+import cz.preclikos.tvhstream.ui.components.TvRecoveryOverlay
 import cz.preclikos.tvhstream.ui.player.VideoPlayerScreen
 import cz.preclikos.tvhstream.ui.screens.ChannelsScreen
 import cz.preclikos.tvhstream.ui.screens.EpgGridScreen
@@ -53,11 +55,10 @@ fun AppRoot(
     onPlayerVisibilityChanged: (Boolean) -> Unit,
 ) {
     val nav = rememberNavController()
-    val context = LocalContext.current
-    val activity = context as? Activity
 
     val appVm: AppConnectionViewModel = koinViewModel()
     val status by appVm.status.collectAsState()
+    val connectionState by appVm.connectionState.collectAsState()
     val channelsVm: ChannelsViewModel = koinViewModel()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
     val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsState()
@@ -91,13 +92,15 @@ fun AppRoot(
     }
 
     BackHandler {
-        when (currentRoute) {
-            Routes.CHANNELS, Routes.EPG -> {
-                activity?.finishAffinity()
-                kotlin.system.exitProcess(0)
-            }
+        val pendingRequest = applianceLaunchRequest
+        when {
+            pendingRequest != null -> applianceLaunchRequests.cancel(pendingRequest)
 
-            Routes.SETTINGS -> {
+            currentRoute == Routes.CHANNELS -> Unit
+
+            currentRoute == Routes.EPG -> nav.popBackStack()
+
+            currentRoute == Routes.SETTINGS -> {
                 nav.navigate(Routes.CHANNELS) { launchSingleTop = true }
             }
 
@@ -158,7 +161,14 @@ fun AppRoot(
 
                     composable(Routes.SETTINGS) {
                         ContentContainer(contentFocus) {
-                            SettingsScreen()
+                            SettingsScreen(
+                                onClose = {
+                                    nav.navigate(Routes.CHANNELS) {
+                                        popUpTo(Routes.CHANNELS) { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
                         }
                     }
 
@@ -184,6 +194,18 @@ fun AppRoot(
                 }
 
                 InfoBanner(message = status, modifier = Modifier.fillMaxSize())
+
+                TvRecoveryOverlay(
+                    visible = applianceLaunchRequest != null && !isPlayer,
+                    message = stringResource(
+                        if (connectionState is ConnectionState.Connected) {
+                            R.string.appliance_starting_tv
+                        } else {
+                            R.string.appliance_connection_recovering
+                        }
+                    ),
+                    hint = stringResource(R.string.appliance_back_for_menu),
+                )
             }
         }
     }

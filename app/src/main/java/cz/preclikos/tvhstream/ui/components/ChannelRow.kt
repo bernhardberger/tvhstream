@@ -33,7 +33,7 @@ import coil3.ImageLoader
 @Composable
 fun ChannelRow(
     modifier: Modifier = Modifier,
-    number: Int,
+    number: Int?,
     name: String,
     programTitle: String,
     progress: Float?,
@@ -80,10 +80,10 @@ fun ChannelRow(
             Spacer(Modifier.width(10.dp))
 
             Text(
-                text = number.toString().padStart(2, ' '),
+                text = number?.toString().orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(30.dp)
+                modifier = Modifier.width(40.dp)
             )
 
             Spacer(Modifier.width(6.dp))

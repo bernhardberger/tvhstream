@@ -2,6 +2,7 @@ package cz.preclikos.tvhstream.services
 
 import android.content.Context
 import androidx.annotation.StringRes
+import cz.preclikos.tvhstream.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,7 +37,7 @@ class StatusServiceImpl : StatusService {
 
     private fun UiText.isWeakConnected(): Boolean = when (this) {
         is UiText.Plain -> value.equals("Connected", ignoreCase = true)
-        is UiText.Res -> false // bez Contextu bezpečně nepoznáš; můžeš porovnat s konkrétním R.string, pokud ho máš
+        is UiText.Res -> resId == R.string.status_connected
     }
 
     override val headline: StateFlow<UiText?> =

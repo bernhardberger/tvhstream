@@ -44,6 +44,13 @@
     <string name="open_accessibility_settings">Bedienungshilfen öffnen</string>
     <string name="appliance_accessibility_service_label">Leoville TV-Start</string>
     <string name="appliance_accessibility_service_description">Öffnet Leoville TV nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
+    <string name="appliance_starting_tv">Fernsehen wird gestartet…</string>
+    <string name="appliance_connection_recovering">Fernsehen ist gerade nicht verfügbar. Die Verbindung wird automatisch wiederhergestellt…</string>
+    <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
+
+    <string name="player_starting_channel">Sender wird gestartet…</string>
+    <string name="player_connection_recovering">Verbindung unterbrochen. Sie wird automatisch wiederhergestellt…</string>
+    <string name="player_playback_recovering">Wiedergabe unterbrochen. Erneuter Versuch läuft automatisch…</string>
 
     <string name="loading_wait">Warten auf Ladevorgang…</string>
     <string name="not_connected">Nicht verbunden</string>
@@ -90,4 +97,9 @@
     <string name="status_epg_warmup_batch">Programmdaten: %1$d/%2$d geladen (%3$d/%4$d aktualisiert)</string>
     <string name="status_channels_ready">Sender verfügbar: %1$d</string>
     <string name="status_syncing_channels">Sender werden synchronisiert… %1$d</string>
+    <string name="status_connecting">Verbindung wird hergestellt…</string>
+    <string name="status_connected">Verbunden</string>
+    <string name="status_syncing">Sender werden geladen…</string>
+    <string name="status_connection_lost">Verbindung unterbrochen. Neuer Versuch…</string>
+    <string name="status_connection_retrying">Fernsehverbindung nicht verfügbar. Neuer Versuch…</string>
 </resources>

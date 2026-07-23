@@ -12,6 +12,7 @@ class VideoPlayerViewModel(
     htspService: HtspService
 ) : ViewModel() {
     val connectionState = htspService.state
+    val playbackState = playerSession.state
 
     fun getPlayerInstance(context: Context) =
         playerSession.getOrCreatePlayer(context)
