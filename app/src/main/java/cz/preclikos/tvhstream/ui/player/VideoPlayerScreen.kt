@@ -42,6 +42,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import cz.preclikos.tvhstream.core.ChannelNavigation
+import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.ConnectionState
 import cz.preclikos.tvhstream.settings.AspectRatioMode
 import cz.preclikos.tvhstream.settings.PlayerSettings
@@ -158,6 +160,30 @@ fun VideoPlayerScreen(
         controlsVisible = false
     }
 
+    fun tuneChannel(channel: ChannelUi): Boolean {
+        selection.setSelected(channel.id)
+        selectedId = channel.id
+
+        currentChannelId = channel.id
+        currentServiceId = channel.id
+        currentChannelName = channel.name
+
+        drawerOpen = false
+        showControls()
+        return true
+    }
+
+    fun tuneAdjacentChannel(direction: Int): Boolean {
+        val adjacentId = ChannelNavigation.adjacentId(
+            orderedIds = channels.map { it.id },
+            currentId = currentChannelId,
+            direction = direction,
+        ) ?: return false
+
+        val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
+        return tuneChannel(channel)
+    }
+
     LaunchedEffect(controlsVisible, interactionToken) {
         if (!controlsVisible) return@LaunchedEffect
         delay(autoHideMs)
@@ -220,6 +246,10 @@ fun VideoPlayerScreen(
             .background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+                ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
+                    return@onPreviewKeyEvent tuneAdjacentChannel(direction)
+                }
 
                 if (showDrawer) {
                     return@onPreviewKeyEvent when (event.key) {
@@ -311,17 +341,7 @@ fun VideoPlayerScreen(
                 nowSec = nowSec,
                 channelsVm = channelsVm,
                 onFocusChannel = { selectedId = it },
-                onPickChannel = {
-                    selection.setSelected(it.id)
-                    selectedId = it.id
-
-                    currentChannelId = it.id
-                    currentServiceId = it.id
-                    currentChannelName = it.name
-
-                    drawerOpen = false
-                    showControls()
-                },
+                onPickChannel = { tuneChannel(it) },
                 focusRequester = drawerFocus,
                 onCloseDrawer = { drawerOpen = false },
             )
