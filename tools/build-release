@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+signing_env="${TVHSTREAM_SIGNING_ENV:-/root/.config/tvhstream/signing.env}"
+if [[ ! -r "$signing_env" ]]; then
+    printf 'error: signing environment is not readable: %s\n' "$signing_env" >&2
+    exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+source "$signing_env"
+set +a
+
+required=(
+    KEYSTORE_PATH
+    ANDROID_KEYSTORE_PASSWORD
+    ANDROID_KEY_ALIAS
+    ANDROID_KEY_PASSWORD
+    TVHSTREAM_SIGNING_LINEAGE
+    TVHSTREAM_LEGACY_KEYSTORE_PATH
+    TVHSTREAM_LEGACY_KEYSTORE_PASSWORD
+    TVHSTREAM_LEGACY_KEY_ALIAS
+    TVHSTREAM_ROTATION_MIN_SDK
+)
+for key in "${required[@]}"; do
+    if [[ -z "${!key:-}" ]]; then
+        printf 'error: %s is missing from %s\n' "$key" "$signing_env" >&2
+        exit 1
+    fi
+done
+
+for path in \
+    "$KEYSTORE_PATH" \
+    "$TVHSTREAM_SIGNING_LINEAGE" \
+    "$TVHSTREAM_LEGACY_KEYSTORE_PATH"; do
+    if [[ ! -r "$path" ]]; then
+        printf 'error: signing input is not readable: %s\n' "$path" >&2
+        exit 1
+    fi
+done
+
+export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+if [[ ! -x "$apksigner" ]]; then
+    printf 'error: apksigner is not available at %s\n' "$apksigner" >&2
+    exit 1
+fi
+
+printf '==> Unit tests and release build\n'
+./gradlew testDebugUnitTest assembleRelease --no-daemon \
+    -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+    -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+    -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+    -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+
+base_apk="app/build/outputs/apk/release/app-release.apk"
+production_apk="app/build/outputs/apk/release/app-release-production.apk"
+if [[ ! -f "$base_apk" ]]; then
+    printf 'error: expected release APK was not produced: %s\n' "$base_apk" >&2
+    exit 1
+fi
+rm -f -- "$production_apk"
+
+printf '==> Production signature and certificate lineage\n'
+"$apksigner" sign \
+    --in "$base_apk" \
+    --out "$production_apk" \
+    --min-sdk-version 28 \
+    --rotation-min-sdk-version "$TVHSTREAM_ROTATION_MIN_SDK" \
+    --debuggable-apk-permitted false \
+    --lineage "$TVHSTREAM_SIGNING_LINEAGE" \
+    --ks "$TVHSTREAM_LEGACY_KEYSTORE_PATH" \
+    --ks-key-alias "$TVHSTREAM_LEGACY_KEY_ALIAS" \
+    --ks-pass env:TVHSTREAM_LEGACY_KEYSTORE_PASSWORD \
+    --key-pass env:TVHSTREAM_LEGACY_KEYSTORE_PASSWORD \
+    --next-signer \
+    --ks "$KEYSTORE_PATH" \
+    --ks-key-alias "$ANDROID_KEY_ALIAS" \
+    --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+    --key-pass env:ANDROID_KEY_PASSWORD
+
+"$apksigner" verify --verbose --print-certs "$production_apk"
+sha256sum "$production_apk"
+printf '==> Production APK: %s\n' "$production_apk"

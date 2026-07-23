@@ -33,6 +33,14 @@
   and persistent initial buffering with bounded retry backoff. Recovery releases
   the failed HTSP subscription first and never changes the extractor or decoder.
 
+## Production handoff
+
+- Source commit `e18d449` is deployed on the household production TV.
+- That TV is no longer a development target. Do not install debug builds, inject
+  remote keys, or run failure, standby, wake, or reboot experiments against it.
+- Further device work requires a separate debug/test TV, which has not yet been
+  selected or configured.
+
 ## Phase 1: Reproducible private build identity
 
 ### Task 1: Create the Leoville build identity
@@ -271,6 +279,13 @@ localized strings, and policy tests.
 
 ### Task 7: Sign and install the release build
 
+**Status (2026-07-23):** Completed for production handover. Source commit
+`e18d449` was built with the private Leoville key and installed in place on the
+TCL V655 appliance through an Android v3/v3.1 signing lineage. App data,
+accessibility consent, and TCL `AUTO_START` were retained; the installed package
+is non-debuggable and selects `armeabi-v7a`. Build/deployment procedure and
+identifiers are in `docs/release-signing.md`.
+
 **Acceptance criteria:**
 
 - Release APK uses a stable private Leoville key outside Git.
@@ -281,7 +296,7 @@ localized strings, and policy tests.
 **Verification:** unit suite, release build, `apksigner verify`, install/upgrade,
 and complete TCL runtime matrix.
 
-**Files:** non-secret signing configuration support and deployment docs.  
+**Files:** `tools/build-release` and `docs/release-signing.md`.
 **Dependencies:** Tasks 1-6b.
 
 ## Risks and mitigations

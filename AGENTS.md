@@ -66,6 +66,9 @@ Use the project-local skills when relevant:
 # Full local verification
 ./tools/verify
 
+# Production-signed release build (requires runtime-only signing material)
+./tools/build-release
+
 # AI harness/config validation
 ./tools/check-ai-harness
 
@@ -90,6 +93,7 @@ The underlying build command is:
 - `app/src/androidTest/` — device/instrumentation tests
 - `docs/` — appliance specification, plan, and engineering/operator notes
 - `tools/` — repeatable local build and device workflows
+- `docs/release-signing.md` — production signing, deployment, and rollback
 - `.opencode/` — project agents, skills, commands, and OpenCode configuration
 
 Keep policy code independent from Android UI where practical so it can be
