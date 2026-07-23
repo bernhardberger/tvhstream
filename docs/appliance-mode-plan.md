@@ -75,6 +75,18 @@ aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 
 ### Task 4: Add one-shot autoplay launch requests
 
+**Status:** Implemented and verified on the TCL on 2026-07-23.
+
+The activity owns an identified pending request and creates a replacement only
+for a new explicit launch. Compose waits for persisted state and non-empty
+current channels, then consumes the matching request before navigating to the
+player. Recomposition, resume, and player Back do not generate requests.
+
+Runtime verification confirmed that force-stop plus launch restored ORF1 HD,
+Back stopped playback without replay while the UI remained open, and a new
+explicit launcher intent started ORF1 HD exactly once. ServusTV HD Oesterreich
+also passed the direct human interlaced-motion regression check.
+
 **Acceptance criteria:**
 
 - Fresh process and explicit appliance intents wait for non-empty channels,

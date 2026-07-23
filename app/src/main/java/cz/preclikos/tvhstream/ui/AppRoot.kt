@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -21,6 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import cz.preclikos.tvhstream.core.ApplianceLaunchRequests
+import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.ui.components.ContentContainer
 import cz.preclikos.tvhstream.ui.components.InfoBanner
 import cz.preclikos.tvhstream.ui.components.SideRail
@@ -29,7 +32,11 @@ import cz.preclikos.tvhstream.ui.screens.ChannelsScreen
 import cz.preclikos.tvhstream.ui.screens.EpgGridScreen
 import cz.preclikos.tvhstream.ui.screens.SettingsScreen
 import cz.preclikos.tvhstream.viewmodels.AppConnectionViewModel
+import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 object Routes {
     const val CHANNELS = "channels"
@@ -41,13 +48,16 @@ object Routes {
 }
 
 @Composable
-fun AppRoot() {
+fun AppRoot(applianceLaunchRequests: ApplianceLaunchRequests) {
     val nav = rememberNavController()
     val context = LocalContext.current
     val activity = context as? Activity
 
     val appVm: AppConnectionViewModel = koinViewModel()
     val status by appVm.status.collectAsState()
+    val channelsVm: ChannelsViewModel = koinViewModel()
+    val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
+    val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsState()
 
     val backStackEntry by nav.currentBackStackEntryAsState()
 
@@ -57,6 +67,21 @@ fun AppRoot() {
     val showRail = topRoute != Routes.PLAYER
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true
+
+    LaunchedEffect(applianceLaunchRequest) {
+        if (applianceLaunchRequest == null) return@LaunchedEffect
+
+        val persistedId = lastPlayedChannelStore.channelId.first()
+        val channels = channelsVm.channels.filter { it.isNotEmpty() }.first()
+        val target = applianceLaunchRequests.resolve(channels.map { it.id }, persistedId)
+            ?: return@LaunchedEffect
+        val channel = channels.firstOrNull { it.id == target.channelId }
+            ?: return@LaunchedEffect
+
+        if (applianceLaunchRequests.consume(target.request)) {
+            nav.navigate(Routes.player(channel.id, channel.id, channel.name))
+        }
+    }
 
     BackHandler {
         when (currentRoute) {
