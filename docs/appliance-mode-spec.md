@@ -39,14 +39,20 @@ data used by channel and playback details.
 
 ```bash
 ./gradlew testDebugUnitTest assembleDebug --no-daemon
-adb -s 192.168.8.183:5555 install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s 192.168.8.183:5555 shell monkey \
-  -p at.leoville.tvhstream \
-  -c android.intent.category.LEANBACK_LAUNCHER 1
+./tools/device install-debug
+./tools/device launch
 ```
 
 Final release builds must use the private Leoville signing key and must not rely
 on the Android debug keystore.
+
+## Device roles
+
+- The deployed household TV is a production appliance. Do not use it for routine
+  debug APK installs, ADB key injection, smoke tests, or development experiments.
+- A separate debug/test TV is not yet assigned. Device testing must wait until a
+  new target is explicitly configured in ignored local device configuration and
+  its identity has been verified.
 
 ## Project structure
 
