@@ -49,6 +49,14 @@ packages/
 
 google-services.json
 
+# Local device and signing configuration
+.tvhstream-device.json
+*.jks
+*.keystore
+keystore.properties
+__pycache__/
+*.py[cod]
+
 # Temporary adb screencap files used during local screenshot/debug sessions
 /_shot_*.png
 /_stage_*.png

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+
+if ! command -v java >/dev/null 2>&1; then
+    printf 'error: Java is not available on PATH\n' >&2
+    exit 1
+fi
+
+java_version="$(java -version 2>&1 | { IFS= read -r line; printf '%s' "$line"; })"
+if [[ ! "$java_version" =~ version\ \"([0-9]+) ]]; then
+    printf 'error: unable to parse Java version from: %s\n' "$java_version" >&2
+    exit 1
+fi
+if (( BASH_REMATCH[1] < 21 )); then
+    printf 'error: Java 21 or newer is required; found: %s\n' "$java_version" >&2
+    exit 1
+fi
+
+if [[ ! -d "$ANDROID_HOME" ]]; then
+    printf 'error: Android SDK not found at %s\n' "$ANDROID_HOME" >&2
+    exit 1
+fi
+
+printf '==> JVM tests and debug APK\n'
+./gradlew testDebugUnitTest assembleDebug --no-daemon
+
+apk="app/build/outputs/apk/debug/app-debug.apk"
+if [[ ! -f "$apk" ]]; then
+    printf 'error: expected APK was not produced: %s\n' "$apk" >&2
+    exit 1
+fi
+
+aapt=""
+for candidate in \
+    "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+    "$ANDROID_HOME/build-tools/35.0.0/aapt"; do
+    if [[ -x "$candidate" ]]; then
+        aapt="$candidate"
+        break
+    fi
+done
+if [[ -z "$aapt" ]] && command -v aapt >/dev/null 2>&1; then
+    aapt="$(command -v aapt)"
+fi
+if [[ -z "$aapt" ]]; then
+    printf 'error: aapt not found in Android build-tools or PATH\n' >&2
+    exit 1
+fi
+
+badging="$($aapt dump badging "$apk")"
+
+required_badging=(
+    "package: name='at.leoville.tvhstream'"
+    "sdkVersion:'28'"
+    "targetSdkVersion:'36'"
+    "application-label:'Leoville TV'"
+    "'armeabi-v7a'"
+)
+for expected in "${required_badging[@]}"; do
+    if [[ "$badging" != *"$expected"* ]]; then
+        printf 'error: APK badging is missing %s\n' "$expected" >&2
+        exit 1
+    fi
+done
+
+printf '==> APK identity\n'
+printf '%s\n' "$badging" | while IFS= read -r line; do
+    case "$line" in
+        package:*|sdkVersion:*|targetSdkVersion:*|application-label:*|native-code:*)
+            printf '%s\n' "$line"
+            ;;
+    esac
+done
+sha256sum "$apk"
+
+printf '==> Verification passed\n'

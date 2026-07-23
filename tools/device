@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Bounded ADB operations for TVHStream Android TV validation.
+
+This wrapper deliberately omits UI hierarchy dumps, app-private data exports,
+and unrestricted logcat/dumpsys output because those paths can expose runtime
+credentials.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LOCAL_CONFIG = ROOT / ".tvhstream-device.json"
+DEFAULT_PACKAGE = "at.leoville.tvhstream"
+DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
+KEY_EVENTS = {
+    "channel-up": "KEYCODE_CHANNEL_UP",
+    "channel-down": "KEYCODE_CHANNEL_DOWN",
+    "guide": "KEYCODE_GUIDE",
+    "home": "KEYCODE_HOME",
+    "back": "KEYCODE_BACK",
+    "power": "KEYCODE_POWER",
+}
+
+
+def fail(message: str) -> "NoReturn":
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def load_local_config() -> dict[str, str]:
+    if not LOCAL_CONFIG.exists():
+        return {}
+    try:
+        value = json.loads(LOCAL_CONFIG.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(f"cannot read {LOCAL_CONFIG}: {exc}")
+    if not isinstance(value, dict):
+        fail(f"{LOCAL_CONFIG} must contain a JSON object")
+    return {str(key): str(item) for key, item in value.items()}
+
+
+def run(
+    command: list[str],
+    *,
+    capture: bool = False,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    print(f"$ {shlex.join(command)}", flush=True)
+    return subprocess.run(
+        command,
+        check=check,
+        text=True,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.PIPE if capture else None,
+    )
+
+
+def adb_command(adb: str, serial: str, *arguments: str) -> list[str]:
+    return [adb, "-s", serial, *arguments]
+
+
+def require_serial(value: str | None) -> str:
+    if not value or value == "replace-with-adb-serial":
+        fail(
+            "ADB serial is required; set TVHSTREAM_ADB_SERIAL, pass --serial, "
+            "or create ignored .tvhstream-device.json"
+        )
+    if any(character.isspace() for character in value):
+        fail("ADB serial must not contain whitespace")
+    return value
+
+
+def show_current_focus(adb: str, serial: str) -> None:
+    result = run(
+        adb_command(adb, serial, "shell", "dumpsys", "window"),
+        capture=True,
+    )
+    lines = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if "mCurrentFocus=" in line or "mFocusedApp=" in line
+    ]
+    if not lines:
+        fail("Android window service did not report a focused activity")
+    print("\n".join(lines))
+
+
+def show_package_info(adb: str, serial: str, package_name: str) -> None:
+    result = run(
+        adb_command(adb, serial, "shell", "dumpsys", "package", package_name),
+        capture=True,
+    )
+    prefixes = (
+        "versionCode=",
+        "versionName=",
+        "firstInstallTime=",
+        "lastUpdateTime=",
+        "primaryCpuAbi=",
+        "secondaryCpuAbi=",
+    )
+    lines = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip().startswith(prefixes)
+    ]
+    if not lines:
+        fail(f"package {package_name} was not found or returned no bounded metadata")
+    print("\n".join(dict.fromkeys(lines)))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--serial",
+        help="ADB device serial; overrides TVHSTREAM_ADB_SERIAL and local config",
+    )
+    parser.add_argument(
+        "--package",
+        dest="package_name",
+        help=f"Android package name (default: {DEFAULT_PACKAGE})",
+    )
+
+    subparsers = parser.add_subparsers(dest="action", required=True)
+    subparsers.add_parser("doctor", help="Check adb, authorization, model, SDK, and ABI")
+    subparsers.add_parser("connect", help="Run adb connect for the configured serial")
+
+    install_parser = subparsers.add_parser(
+        "install-debug", help="Install or update the debug APK"
+    )
+    install_parser.add_argument(
+        "--apk",
+        type=Path,
+        default=DEFAULT_APK,
+        help=f"APK path (default: {DEFAULT_APK.relative_to(ROOT)})",
+    )
+
+    subparsers.add_parser("launch", help="Launch the Leanback activity")
+    subparsers.add_parser("force-stop", help="Force-stop the selected package")
+    subparsers.add_parser("current", help="Show only the current/focused activity")
+    subparsers.add_parser("package-info", help="Show bounded package metadata")
+    subparsers.add_parser("smoke", help="Force-stop, launch, and show current focus")
+
+    key_parser = subparsers.add_parser("key", help="Send one approved named key event")
+    key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    config = load_local_config()
+
+    adb = shutil.which("adb")
+    if not adb:
+        fail("adb is not available on PATH")
+
+    serial = require_serial(
+        args.serial or os.environ.get("TVHSTREAM_ADB_SERIAL") or config.get("serial")
+    )
+    package_name = (
+        args.package_name
+        or os.environ.get("TVHSTREAM_ANDROID_PACKAGE")
+        or config.get("package")
+        or DEFAULT_PACKAGE
+    )
+
+    if args.action == "connect":
+        run([adb, "connect", serial])
+        return 0
+
+    if args.action == "doctor":
+        run([adb, "version"])
+        state = run(adb_command(adb, serial, "get-state"), capture=True, check=False)
+        if state.returncode != 0 or state.stdout.strip() != "device":
+            detail = (state.stderr or state.stdout).strip()
+            fail(f"device {serial} is not ready: {detail or 'unknown adb state'}")
+        property_names = (
+            "ro.product.manufacturer",
+            "ro.product.model",
+            "ro.build.version.release",
+            "ro.product.cpu.abilist",
+        )
+        properties = [
+            run(
+                adb_command(adb, serial, "shell", "getprop", property_name),
+                capture=True,
+            ).stdout.strip()
+            for property_name in property_names
+        ]
+        print(f"device={serial}")
+        print(f"manufacturer|model|android|abis={'|'.join(properties)}")
+        return 0
+
+    if args.action == "install-debug":
+        apk = args.apk.expanduser().resolve()
+        if not apk.is_file():
+            fail(f"APK does not exist: {apk}")
+        run(adb_command(adb, serial, "install", "-r", str(apk)))
+        return 0
+
+    if args.action == "launch":
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "monkey",
+                "-p",
+                package_name,
+                "-c",
+                "android.intent.category.LEANBACK_LAUNCHER",
+                "1",
+            )
+        )
+        return 0
+
+    if args.action == "force-stop":
+        run(adb_command(adb, serial, "shell", "am", "force-stop", package_name))
+        return 0
+
+    if args.action == "current":
+        show_current_focus(adb, serial)
+        return 0
+
+    if args.action == "package-info":
+        show_package_info(adb, serial, package_name)
+        return 0
+
+    if args.action == "key":
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "input",
+                "keyevent",
+                KEY_EVENTS[args.name],
+            )
+        )
+        return 0
+
+    if args.action == "smoke":
+        run(adb_command(adb, serial, "shell", "am", "force-stop", package_name))
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "monkey",
+                "-p",
+                package_name,
+                "-c",
+                "android.intent.category.LEANBACK_LAUNCHER",
+                "1",
+            )
+        )
+        time.sleep(2)
+        show_current_focus(adb, serial)
+        return 0
+
+    parser.error(f"unsupported action: {args.action}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
