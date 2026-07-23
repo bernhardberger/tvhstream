@@ -141,6 +141,7 @@ fun VideoPlayerScreen(
             videoPlayerViewModel.stop()
         }
         videoPlayerViewModel.playService(ctx, currentServiceId)
+        settingsStore.setLastPlayedChannel(currentChannelId)
         lastPlayedServiceId = currentServiceId
     }
 
