@@ -55,6 +55,7 @@ fi
 
 badging="$($aapt dump badging "$apk")"
 manifest_tree="$($aapt dump xmltree "$apk" AndroidManifest.xml)"
+accessibility_tree="$($aapt dump xmltree "$apk" res/xml/appliance_entry_accessibility_service.xml)"
 
 required_badging=(
     "package: name='at.leoville.tvhstream'"
@@ -80,6 +81,34 @@ for expected in "${required_home_entries[@]}"; do
         exit 1
     fi
 done
+
+required_accessibility_entries=(
+    'cz.preclikos.tvhstream.accessibility.ApplianceEntryAccessibilityService'
+    'android.permission.BIND_ACCESSIBILITY_SERVICE'
+    'android.accessibilityservice.AccessibilityService'
+)
+for expected in "${required_accessibility_entries[@]}"; do
+    if [[ "$manifest_tree" != *"$expected"* ]]; then
+        printf 'error: APK manifest is missing accessibility entry %s\n' "$expected" >&2
+        exit 1
+    fi
+done
+
+required_accessibility_metadata=(
+    'android:accessibilityFlags(0x01010384)=(type 0x11)0x21'
+    'android:canRetrieveWindowContent(0x01010385)=(type 0x12)0x0'
+    'android:canRequestFilterKeyEvents(0x010103d9)=(type 0x12)0xffffffff'
+)
+for expected in "${required_accessibility_metadata[@]}"; do
+    if [[ "$accessibility_tree" != *"$expected"* ]]; then
+        printf 'error: accessibility metadata is missing %s\n' "$expected" >&2
+        exit 1
+    fi
+done
+if [[ "$accessibility_tree" == *'android:accessibilityEventTypes'* ]]; then
+    printf 'error: accessibility service must not subscribe to window or content events\n' >&2
+    exit 1
+fi
 
 printf '==> APK identity\n'
 printf '%s\n' "$badging" | while IFS= read -r line; do

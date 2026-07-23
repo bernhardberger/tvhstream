@@ -26,6 +26,14 @@
     <string name="audio_language">Jazyk zvuku</string>
     <string name="subtitle_language">Jazyk titulků</string>
 
+    <string name="settings_appliance">Nastavení – Spouštění TV</string>
+    <string name="appliance_accessibility_disclosure">Po zapnutí se Leoville TV otevře při spuštění a probuzení televize a převezme pouze tlačítko TV/PROGRAM. Nečte obsah obrazovky ani text. Všechna ostatní tlačítka zůstávají beze změny.</string>
+    <string name="appliance_service_enabled">Služba spouštění TV: zapnuta</string>
+    <string name="appliance_service_disabled">Služba spouštění TV: vypnuta</string>
+    <string name="open_accessibility_settings">Otevřít nastavení přístupnosti</string>
+    <string name="appliance_accessibility_service_label">Spouštění Leoville TV</string>
+    <string name="appliance_accessibility_service_description">Otevírá Leoville TV při spuštění a probuzení a mapuje pouze tlačítko TV/PROGRAM. Nemůže číst obsah obrazovky.</string>
+
     <string name="loading_wait">Načítání čeká…</string>
     <string name="not_connected">Nepřipojeno</string>
     <string name="loading">Načítám…</string>

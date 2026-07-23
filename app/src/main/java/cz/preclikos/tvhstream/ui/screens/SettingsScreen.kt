@@ -18,6 +18,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import cz.preclikos.tvhstream.ui.Routes
 import cz.preclikos.tvhstream.ui.components.SettingsSubRail
+import cz.preclikos.tvhstream.ui.screens.settings.SettingsAppliance
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsConnection
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsPlayer
 
@@ -25,6 +26,7 @@ object SettingsRoutes {
     const val GENERAL = "settings/general"
     const val PLAYER = "settings/player"
     const val CONNECTION = "settings/connection"
+    const val APPLIANCE = "settings/appliance"
     const val ABOUT = "settings/about"
 }
 
@@ -36,8 +38,6 @@ fun SettingsScreen() {
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val topRoute = currentRoute?.substringBefore("/")
-
     BackHandler {
         when (currentRoute) {
             Routes.CHANNELS, Routes.EPG -> {
@@ -58,7 +58,7 @@ fun SettingsScreen() {
     ) {
         Row(Modifier.fillMaxSize()) {
             SettingsSubRail(
-                currentRoute = topRoute,
+                currentRoute = currentRoute,
                 onNavigate = { route ->
                     nav.navigate(route) {
                         popUpTo(Routes.CHANNELS) { inclusive = false }
@@ -83,6 +83,10 @@ fun SettingsScreen() {
 
                     composable(SettingsRoutes.PLAYER) {
                         SettingsPlayer()
+                    }
+
+                    composable(SettingsRoutes.APPLIANCE) {
+                        SettingsAppliance()
                     }
                 }
             }

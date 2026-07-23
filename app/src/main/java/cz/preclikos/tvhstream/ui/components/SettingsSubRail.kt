@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +62,9 @@ fun SettingsSubRail(
             },
             RailItem(SettingsRoutes.PLAYER, "Player") {
                 Icon(Icons.Filled.PlayArrow, null, tint = Color.White)
+            },
+            RailItem(SettingsRoutes.APPLIANCE, "Appliance") {
+                Icon(Icons.Filled.Home, null, tint = Color.White)
             }
         )
     }

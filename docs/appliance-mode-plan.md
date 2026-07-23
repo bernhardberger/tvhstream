@@ -15,8 +15,14 @@
   firmware currently blocks selection of third-party HOME apps with a
   privileged launcher priority, so boot/wake entry needs a separate safe
   follow-up before it can be considered complete.
-- Use an accessibility service only for TCL's globally intercepted
-  `KEYCODE_GUIDE`; all other keys pass through unchanged.
+- Use one consented accessibility service to filter TCL's globally intercepted
+  `KEYCODE_GUIDE` and enter the app when the service connects or the display
+  wakes. TCL exposes the physical button to Android as private key code `4001`,
+  so the service recognizes that captured code too. It subscribes to no
+  accessibility events or window content, and all other keys pass through.
+- Treat initial channel metadata as one atomic snapshot: HTSP control delivery
+  applies backpressure instead of dropping messages, and the repository publishes
+  channels only after `initialSyncCompleted`.
 
 ## Phase 1: Reproducible private build identity
 
@@ -110,7 +116,8 @@ both `cmd package set-home-activity` and affirmative selection in Android's Home
 app screen store Leoville as preferred, but Google Basic TV still resolves and
 opens. The system launcher has privileged priority `2`, while Android caps the
 third-party Leoville filter to `0`. Google remains enabled and selected; no
-standby/wake or cold-reboot success is claimed.
+HOME-role standby/wake or cold-reboot success is claimed. The separate
+accessibility entry fallback is validated under Task 6.
 
 **Acceptance criteria:**
 
@@ -130,21 +137,45 @@ receiver fallback.
 
 ### Task 6: Add the scoped GUIDE accessibility service
 
+**Status:** Implemented and verified on the TCL on 2026-07-23.
+
+TCL initially stored the user-approved service component but left global
+accessibility off because Safety Guard rejected the app's hidden
+`APP_AUTO_START` operation. Setting that app-op to `allow` for Leoville only and
+repeating the Android consent toggle bound the service. The setting, app-op, and
+live autoplay then survived three standby/wake cycles from Google Home and one
+approved Android reboot while Google remained the default HOME.
+
+The physical remote reports Linux `KEY_EPG` with scan code `0x0c005b`, but TCL's
+Android callback exposes private key code `4001`, not standard `KEYCODE_GUIDE`
+(`172`). The service recognizes both codes. Physical TV launched playback from
+TCL UI and Leoville's operator UI, and pressing it during playback no longer
+restarts the player. The final metadata requests key filtering but no
+accessibility events or window-content access.
+
 **Acceptance criteria:**
 
-- Service declares key filtering without window-content access.
+- Service declares key filtering without window-content access or accessibility
+  event subscriptions.
 - GUIDE down launches/reorders Leoville TV and GUIDE up is consumed.
-- Every non-GUIDE key returns `false`.
+- An entry intent while the player is already visible does not restart playback.
+- Every key other than standard GUIDE and captured TCL code `4001` returns
+  `false`.
+- Service connection after boot and `SCREEN_ON` after standby each create a
+  coalesced appliance launch through the existing one-shot policy.
+- Enabling requires affirmative selection in Android accessibility settings and
+  the in-app disclosure describes the exact scope.
 
 **Verification:** key-policy unit tests, Android service inspection, and the
-physical TV button from Google Home, channel UI, and playback.
+physical TV button from Google Home, channel UI, and playback; then standby/wake
+and an approved cold reboot with enabled-service and app-op state rechecked.
 
 **Files:** service class, policy/test, manifest, XML metadata, and strings.  
 **Dependencies:** Task 4.
 
 ### Checkpoint: Appliance behavior
 
-- HOME and TV key both reach live TV.
+- TV, boot, and wake reach live TV; direct HOME remains blocked by TCL.
 - CH+/CH- work in live playback.
 - Back still reaches operator UI.
 - Google Basic TV and both rollback clients still launch directly.
@@ -170,10 +201,11 @@ and complete TCL runtime matrix.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| TCL resets HOME or accessibility after reboot | High | Keep Google/Headent rollback; test a true cold reboot before declaring success |
-| Accessibility service receives GUIDE too late | High | Validate before package changes; dreamLauncher proved the same API path on this model |
+| TCL resets HOME or accessibility after reboot | High | `APP_AUTO_START=allow` plus the user-enabled service survived three wake cycles and one reboot; retain rollback and recheck after firmware updates |
+| TCL changes its private TV key mapping | High | Recognize standard GUIDE plus captured Android code `4001`; recapture after firmware or remote changes |
 | Autoplay loops after Back | High | One-shot request counter with tests; never key autoplay directly to lifecycle resume |
 | Persisted channel disappears | Medium | Validate against current channel IDs and fall back to first channel |
+| Channel synchronization exposes partial lists | High | Lossless control delivery and atomic initial publication are implemented with JVM regressions; recheck a stable count across reconnects on the TCL |
 | Media3 playback regresses | High | Do not alter extractor/rendering code; replay progressive and interlaced channels at each checkpoint |
 | Fork diverges from upstream | Medium | Keep appliance changes narrow and maintain the upstream remote |
 

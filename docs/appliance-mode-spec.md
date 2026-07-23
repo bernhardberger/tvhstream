@@ -7,8 +7,9 @@ appliance for a household user who should not need to navigate Google TV.
 
 The app must keep TVHeadend's existing `mberger` account local to the device,
 play the last selected channel after an appliance launch, support the physical
-channel buttons, and reclaim TCL's globally intercepted TV/GUIDE button through
-a narrowly scoped accessibility service.
+channel buttons, reclaim TCL's globally intercepted TV/GUIDE button, and enter
+live TV after boot or display wake through a narrowly scoped accessibility
+service.
 
 The upstream-shaped channel list, EPG, and settings remain available as an
 operator path. The app must not immediately restart playback after the user
@@ -21,7 +22,8 @@ backs out to those screens.
 - AndroidX Media3 / ExoPlayer 1.9.2
 - TVHeadend HTSP through the existing custom extractor
 - Preferences DataStore for non-secret last-channel state
-- Android `AccessibilityService` only for the intercepted GUIDE key
+- Android `AccessibilityService` for GUIDE filtering plus boot/wake appliance
+  entry, without subscribing to accessibility events or window content
 - GPL-3.0; the public fork retains upstream copyright and license material
 
 ## Commands
@@ -42,7 +44,7 @@ on the Android debug keystore.
 - `app/src/main/java/.../player/` — Media3 playback and channel switching
 - `app/src/main/java/.../stores/` — persisted last-channel selection
 - `app/src/main/java/.../ui/` — launch policy and normal TV UI
-- `app/src/main/java/.../accessibility/` — GUIDE-key interception only
+- `app/src/main/java/.../accessibility/` — GUIDE filtering and boot/wake entry
 - `app/src/main/res/xml/` — accessibility-service declaration
 - `app/src/test/` — pure launch/navigation policy tests
 - `docs/` — appliance behavior, build, and rollback documentation
@@ -84,7 +86,9 @@ fun adjacentChannelId(
 - Preserve a route to channel list, EPG, and settings through Back navigation.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
 - Use a distinct Leoville application ID and stable signing key.
-- Consume only the known TCL GUIDE key in the accessibility service.
+- Consume only Android GUIDE and the captured TCL TV key code in the
+  accessibility service; boot/wake entry must not subscribe to accessibility
+  events or inspect window content.
 
 ### Ask first
 
@@ -110,10 +114,12 @@ fun adjacentChannelId(
    ends of the list.
 4. The last successfully selected channel survives process death and reboot.
 5. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
-   and channel data, then plays the persisted channel or the first channel.
+   and channel data, then plays the persisted channel or the first channel. If
+   playback is already visible, the entry intent must not restart it.
 6. Back exits playback to the normal TVHStream UI without an autoplay loop.
-7. The accessibility service ignores every key except `KEYCODE_GUIDE` and does
-   not interfere with keys while disabled.
+7. The accessibility service ignores every key except Android GUIDE and the
+   captured TCL TV key code, does not subscribe to accessibility events or
+   window content, and does not interfere with keys while disabled.
 8. Google Basic TV, Headent, and the diagnostic TVHStream package remain
    available as rollback paths during validation.
 9. Unit tests pass, the release APK is signed with the stable private key, and
@@ -125,8 +131,16 @@ fun adjacentChannelId(
   The firmware gives its system launcher priority `2`, caps third-party HOME
   candidates to priority `0`, and ignores both shell and user role selection.
   Google must remain enabled until a safe reversible path is proven.
-- Whether TCL retains the enabled accessibility service across a true cold
-  reboot. This must be answered by runtime testing, not by assumption.
-- Whether the GUIDE event reaches the custom accessibility service before TCL's
-  native TV handler. dreamLauncher previously proved the mechanism on this TV,
-  but the new service still requires direct validation.
+
+## TCL deployment findings
+
+- TCL Safety Guard must allow the appliance package's hidden `APP_AUTO_START`
+  app-op before the user-approved accessibility service will bind. The enabled
+  service and app-op survived three standby/wake cycles and one Android reboot.
+- The physical TV button emits Linux `KEY_EPG`, but this firmware delivers TCL
+  private Android key code `4001` to accessibility services. The service also
+  accepts standard Android `KEYCODE_GUIDE` for non-TCL input paths.
+- Initial channel metadata is delivered without lossy buffering and staged until
+  `initialSyncCompleted`, so the UI receives one complete channel snapshot rather
+  than unstable partial lists (previously observed around 30, 84, and 50 channels).
+  Recheck the stable count on the TCL before final appliance deployment.

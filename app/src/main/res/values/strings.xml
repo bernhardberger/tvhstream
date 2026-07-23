@@ -28,6 +28,14 @@
     <string name="audio_language">Audio Language</string>
     <string name="subtitle_language">Subtitle Language</string>
 
+    <string name="settings_appliance">Settings - Appliance entry</string>
+    <string name="appliance_accessibility_disclosure">When enabled, Leoville TV opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
+    <string name="appliance_service_enabled">Appliance entry service: enabled</string>
+    <string name="appliance_service_disabled">Appliance entry service: disabled</string>
+    <string name="open_accessibility_settings">Open accessibility settings</string>
+    <string name="appliance_accessibility_service_label">Leoville appliance entry</string>
+    <string name="appliance_accessibility_service_description">Opens Leoville TV at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
+
     <string name="loading_wait">Waiting for loading…</string>
     <string name="not_connected">Not connected</string>
     <string name="loading">Loading…</string>

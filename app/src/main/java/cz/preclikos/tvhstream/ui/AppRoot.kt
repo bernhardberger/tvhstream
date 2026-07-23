@@ -48,7 +48,10 @@ object Routes {
 }
 
 @Composable
-fun AppRoot(applianceLaunchRequests: ApplianceLaunchRequests) {
+fun AppRoot(
+    applianceLaunchRequests: ApplianceLaunchRequests,
+    onPlayerVisibilityChanged: (Boolean) -> Unit,
+) {
     val nav = rememberNavController()
     val context = LocalContext.current
     val activity = context as? Activity
@@ -67,6 +70,10 @@ fun AppRoot(applianceLaunchRequests: ApplianceLaunchRequests) {
     val showRail = topRoute != Routes.PLAYER
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true
+
+    LaunchedEffect(isPlayer) {
+        onPlayerVisibilityChanged(isPlayer)
+    }
 
     LaunchedEffect(applianceLaunchRequest) {
         if (applianceLaunchRequest == null) return@LaunchedEffect
