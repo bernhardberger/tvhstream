@@ -11,6 +11,7 @@ import cz.preclikos.tvhstream.settings.PlayerSettingsStore
 import cz.preclikos.tvhstream.settings.SecurePasswordStore
 import cz.preclikos.tvhstream.settings.ServerSettingsStore
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
+import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.viewmodels.AppConnectionViewModel
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import cz.preclikos.tvhstream.viewmodels.SettingsPlayerViewModel
@@ -40,6 +41,7 @@ val appModule = module {
     single { PlayerSettingsStore(context = get()) }
 
     single { ChannelSelectionStore() }
+    single { LastPlayedChannelStore(context = get()) }
 
     single { PlayerSession(htsp = get(), playerSettingsStore = get()) }
 

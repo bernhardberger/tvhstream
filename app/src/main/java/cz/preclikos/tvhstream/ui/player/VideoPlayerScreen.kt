@@ -49,6 +49,7 @@ import cz.preclikos.tvhstream.settings.AspectRatioMode
 import cz.preclikos.tvhstream.settings.PlayerSettings
 import cz.preclikos.tvhstream.settings.PlayerSettingsStore
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
+import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.ui.common.nextAfter
 import cz.preclikos.tvhstream.ui.common.nowEvent
 import cz.preclikos.tvhstream.ui.components.KeepScreenOn
@@ -78,6 +79,7 @@ val bottomGradient = Brush.verticalGradient(
 fun VideoPlayerScreen(
     videoPlayerViewModel: VideoPlayerViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
+    lastPlayedChannelStore: LastPlayedChannelStore = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     channelsVm: ChannelsViewModel = koinViewModel(),
     channelId: Int,
@@ -143,6 +145,7 @@ fun VideoPlayerScreen(
             videoPlayerViewModel.stop()
         }
         videoPlayerViewModel.playService(ctx, currentServiceId)
+        lastPlayedChannelStore.setChannelId(currentChannelId)
         lastPlayedServiceId = currentServiceId
     }
 
