@@ -4,8 +4,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.google.services)
-    alias(libs.plugins.google.firebase)
 }
 
 kotlin {
@@ -17,11 +15,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "cz.preclikos.tvhstream"
+        applicationId = "at.leoville.tvhstream"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
-        versionName = "Development"
+        versionName = "1.0.0-leoville.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -42,8 +40,6 @@ android {
 }
 
 dependencies {
-    implementation(platform(libs.firebase.bom))
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -79,9 +75,6 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.ui)
     implementation(libs.kotlinx.coroutines.core)
-
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.analytics)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
