@@ -90,7 +90,8 @@ sealed interface HtspEvent {
 data class ChannelUi(
     val id: Int,
     val name: String,
-    val icon: String?
+    val icon: String?,
+    val number: Int?,
 )
 
 data class EpgEventEntry(

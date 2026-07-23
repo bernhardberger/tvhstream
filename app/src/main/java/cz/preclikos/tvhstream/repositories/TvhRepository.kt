@@ -483,7 +483,7 @@ class TvhRepository(
                     { it.name.lowercase() },
                     { it.id })
             )
-            .map { ChannelUi(it.id, formatName(it), it.icon) }
+            .map { ChannelUi(it.id, formatName(it), it.icon, it.number) }
 
         _channelsUi.value = sorted
     }
