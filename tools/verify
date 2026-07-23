@@ -54,6 +54,7 @@ if [[ -z "$aapt" ]]; then
 fi
 
 badging="$($aapt dump badging "$apk")"
+manifest_tree="$($aapt dump xmltree "$apk" AndroidManifest.xml)"
 
 required_badging=(
     "package: name='at.leoville.tvhstream'"
@@ -65,6 +66,17 @@ required_badging=(
 for expected in "${required_badging[@]}"; do
     if [[ "$badging" != *"$expected"* ]]; then
         printf 'error: APK badging is missing %s\n' "$expected" >&2
+        exit 1
+    fi
+done
+
+required_home_entries=(
+    'android.intent.category.HOME'
+    'android.intent.category.DEFAULT'
+)
+for expected in "${required_home_entries[@]}"; do
+    if [[ "$manifest_tree" != *"$expected"* ]]; then
+        printf 'error: APK manifest is missing HOME entry %s\n' "$expected" >&2
         exit 1
     fi
 done

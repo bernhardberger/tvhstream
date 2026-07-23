@@ -11,8 +11,10 @@
 - Represent appliance launches as one-shot requests owned by `MainActivity`.
   Compose consumes a request only after channels are available. Closing the
   player with Back does not create a new request.
-- Use the HOME role for boot/wake entry. Do not add a permanent foreground
-  service or disable the Google/TCL launcher.
+- Register for the HOME role without disabling the Google/TCL launcher. TCL's
+  firmware currently blocks selection of third-party HOME apps with a
+  privileged launcher priority, so boot/wake entry needs a separate safe
+  follow-up before it can be considered complete.
 - Use an accessibility service only for TCL's globally intercepted
   `KEYCODE_GUIDE`; all other keys pass through unchanged.
 
@@ -100,6 +102,15 @@ also passed the direct human interlaced-motion regression check.
 **Dependencies:** Task 2.
 
 ### Task 5: Register and validate the HOME role
+
+**Status:** Candidate registration implemented; TCL selection blocked.
+
+The packaged activity appears in Android's HOME candidate list. On the TCL,
+both `cmd package set-home-activity` and affirmative selection in Android's Home
+app screen store Leoville as preferred, but Google Basic TV still resolves and
+opens. The system launcher has privileged priority `2`, while Android caps the
+third-party Leoville filter to `0`. Google remains enabled and selected; no
+standby/wake or cold-reboot success is claimed.
 
 **Acceptance criteria:**
 

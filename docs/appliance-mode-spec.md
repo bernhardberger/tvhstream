@@ -121,9 +121,12 @@ fun adjacentChannelId(
 
 ## Open questions
 
-- Whether TCL retains the selected HOME app and enabled accessibility service
-  across a true cold reboot. This must be answered by runtime testing, not by
-  assumption.
+- How to make Leoville the TCL's HOME app without disabling Google Basic TV.
+  The firmware gives its system launcher priority `2`, caps third-party HOME
+  candidates to priority `0`, and ignores both shell and user role selection.
+  Google must remain enabled until a safe reversible path is proven.
+- Whether TCL retains the enabled accessibility service across a true cold
+  reboot. This must be answered by runtime testing, not by assumption.
 - Whether the GUIDE event reaches the custom accessibility service before TCL's
   native TV handler. dreamLauncher previously proved the mechanism on this TV,
   but the new service still requires direct validation.
