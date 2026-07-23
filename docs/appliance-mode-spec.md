@@ -15,6 +15,9 @@ The upstream-shaped channel list, EPG, and settings remain available as an
 operator path. The app must not immediately restart playback after the user
 backs out to those screens.
 
+The operator UI is available in English, German, and Czech. Its in-app language
+setting lists system default and all three supported languages.
+
 ## Tech stack
 
 - Android API 28 minimum / API 36 target
@@ -126,7 +129,9 @@ fun adjacentChannelId(
 9. Google Basic TV, Headent, and the diagnostic TVHStream package remain
    available as rollback paths during validation.
 10. Unit tests pass, the release APK is signed with the stable private key, and
-   installed package/signature/version details are recorded without secrets.
+    installed package/signature/version details are recorded without secrets.
+11. The operator can switch between system language, German, English, and Czech
+    in the app, and the choice persists across relaunches.
 
 ## Open questions
 

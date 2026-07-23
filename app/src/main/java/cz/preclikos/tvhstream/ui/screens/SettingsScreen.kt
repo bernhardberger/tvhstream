@@ -20,6 +20,7 @@ import cz.preclikos.tvhstream.ui.Routes
 import cz.preclikos.tvhstream.ui.components.SettingsSubRail
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsAppliance
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsConnection
+import cz.preclikos.tvhstream.ui.screens.settings.SettingsLanguage
 import cz.preclikos.tvhstream.ui.screens.settings.SettingsPlayer
 
 object SettingsRoutes {
@@ -77,6 +78,10 @@ fun SettingsScreen() {
                     navController = nav,
                     startDestination = SettingsRoutes.CONNECTION,
                 ) {
+                    composable(SettingsRoutes.GENERAL) {
+                        SettingsLanguage()
+                    }
+
                     composable(SettingsRoutes.CONNECTION) {
                         SettingsConnection()
                     }

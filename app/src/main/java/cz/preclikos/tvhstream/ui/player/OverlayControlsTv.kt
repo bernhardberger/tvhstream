@@ -255,7 +255,12 @@ fun OverlayControlsTv(
 
 
                         RoundIconButton(
-                            icon = { Icon(Icons.Filled.Stop, contentDescription = "Stop") },
+                            icon = {
+                                Icon(
+                                    Icons.Filled.Stop,
+                                    contentDescription = stringResource(R.string.stop),
+                                )
+                            },
                             onClick = { onUserInteraction(); onBack() },
                             focusRequester = stopFR,
                             onFocused = { lastFocused = 0 }
@@ -348,7 +353,7 @@ fun OverlayControlsTv(
                                 icon = {
                                     Icon(
                                         Icons.AutoMirrored.Filled.VolumeUp,
-                                        contentDescription = "Audio"
+                                        contentDescription = stringResource(R.string.audio_track)
                                     )
                                 },
                                 onClick = { onUserInteraction(); showAudio = true },
@@ -359,7 +364,7 @@ fun OverlayControlsTv(
                                 icon = {
                                     Icon(
                                         Icons.Filled.Subtitles,
-                                        contentDescription = "Subtitles"
+                                        contentDescription = stringResource(R.string.subtitles)
                                     )
                                 },
                                 onClick = { onUserInteraction(); showSubs = true },

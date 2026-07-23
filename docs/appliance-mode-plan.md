@@ -23,6 +23,9 @@
 - Treat initial channel metadata as one atomic snapshot: HTSP control delivery
   applies backpressure instead of dropping messages, and the repository publishes
   channels only after `initialSyncCompleted`.
+- Use AndroidX per-app locales for the operator UI. The empty locale list follows
+  the device language, while explicit English, German, and Czech choices persist
+  through the platform-compatible locale store.
 
 ## Phase 1: Reproducible private build identity
 
@@ -203,6 +206,25 @@ and an approved cold reboot with enabled-service and app-op state rechecked.
 - Google Basic TV and both rollback clients still launch directly.
 
 ## Phase 5: Durable release and deployment
+
+### Task 6a: Add German operator UI and language selection
+
+**Status:** Implemented locally; device validation pending.
+
+**Acceptance criteria:**
+
+- All user-facing resource strings have context-appropriate German translations.
+- Settings lists system default and every supported language and applies changes
+  without restarting the process manually.
+- The selected app language persists across relaunches.
+
+**Verification:** JVM locale-policy test, full debug build, and remote-control
+selection on the TCL.
+
+**Files:** locale resources and metadata, a language settings screen, and
+localized navigation labels.
+
+**Dependencies:** None.
 
 ### Task 7: Sign and install the release build
 

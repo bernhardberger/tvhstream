@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +43,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.models.RailItem
 import cz.preclikos.tvhstream.ui.screens.SettingsRoutes
 
@@ -55,15 +58,22 @@ fun SettingsSubRail(
 ) {
     var railFocused by remember { mutableStateOf(false) }
 
-    val items = remember {
+    val languageLabel = stringResource(R.string.navigation_language)
+    val connectionLabel = stringResource(R.string.navigation_connection)
+    val playerLabel = stringResource(R.string.navigation_player)
+    val applianceLabel = stringResource(R.string.navigation_appliance)
+    val items = remember(languageLabel, connectionLabel, playerLabel, applianceLabel) {
         listOf(
-            RailItem(SettingsRoutes.CONNECTION, "Connection") {
+            RailItem(SettingsRoutes.GENERAL, languageLabel) {
+                Icon(Icons.Filled.Language, null, tint = Color.White)
+            },
+            RailItem(SettingsRoutes.CONNECTION, connectionLabel) {
                 Icon(Icons.AutoMirrored.Filled.List, null, tint = Color.White)
             },
-            RailItem(SettingsRoutes.PLAYER, "Player") {
+            RailItem(SettingsRoutes.PLAYER, playerLabel) {
                 Icon(Icons.Filled.PlayArrow, null, tint = Color.White)
             },
-            RailItem(SettingsRoutes.APPLIANCE, "Appliance") {
+            RailItem(SettingsRoutes.APPLIANCE, applianceLabel) {
                 Icon(Icons.Filled.Home, null, tint = Color.White)
             }
         )

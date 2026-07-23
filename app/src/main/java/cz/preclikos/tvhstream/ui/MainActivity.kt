@@ -2,12 +2,12 @@ package cz.preclikos.tvhstream.ui
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import cz.preclikos.tvhstream.core.ApplianceEntryPolicy
 import cz.preclikos.tvhstream.core.ApplianceLaunchRequests
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val applianceLaunchRequests = ApplianceLaunchRequests()
     private var isPlayerVisible = false
 
