@@ -462,11 +462,8 @@ class TvhRepository(
     }
 
     private fun publishChannelsLocked(channels: List<ChannelMetadata>) {
-        _channelsUi.value = channels.map { ChannelUi(it.id, formatName(it), it.icon) }
+        _channelsUi.value = channels.map { ChannelUi(it.id, it.name, it.icon) }
     }
-
-    private fun formatName(c: ChannelMetadata): String =
-        if (c.number != null) "${c.number}  ${c.name}" else c.name
 
     // ---------------------------
     // Query helpers

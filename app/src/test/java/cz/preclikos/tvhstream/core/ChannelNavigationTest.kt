@@ -91,4 +91,11 @@ class ChannelNavigationTest {
         assertNull(ChannelNavigation.idForNumber(channels, "4"))
         assertNull(ChannelNavigation.idForNumber(channels, ""))
     }
+
+    @Test
+    fun channelNumber_isOneBasedPositionInVisibleChannels() {
+        assertEquals(1, ChannelNavigation.numberForId(channels, 10))
+        assertEquals(3, ChannelNavigation.numberForId(channels, 30))
+        assertNull(ChannelNavigation.numberForId(channels, 99))
+    }
 }

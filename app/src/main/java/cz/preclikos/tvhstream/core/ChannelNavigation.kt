@@ -32,6 +32,11 @@ object ChannelNavigation {
         return orderedIds.getOrNull(number - 1)
     }
 
+    fun numberForId(orderedIds: List<Int>, channelId: Int): Int? {
+        val index = orderedIds.indexOf(channelId)
+        return if (index >= 0) index + 1 else null
+    }
+
     fun adjacentId(
         orderedIds: List<Int>,
         currentId: Int,

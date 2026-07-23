@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Stop
@@ -30,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -41,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.settings.AspectRatioMode
@@ -48,11 +51,15 @@ import cz.preclikos.tvhstream.ui.common.formatClock
 import cz.preclikos.tvhstream.ui.common.formatHms
 import cz.preclikos.tvhstream.ui.common.progress
 import cz.preclikos.tvhstream.ui.components.RoundIconButton
+import cz.preclikos.tvhstream.ui.components.PiconBox
 
 @Composable
 fun OverlayControlsTv(
     player: Player,
+    imageLoader: ImageLoader,
+    channelNumber: Int?,
     channelName: String,
+    piconPath: String?,
     nowEvent: EpgEventEntry?,
     nextEvent: EpgEventEntry?,
     nowSec: Long,
@@ -91,7 +98,7 @@ fun OverlayControlsTv(
         } ?: "—"
     }
 
-    val title = remember(nowEvent, channelName) { nowEvent?.title ?: channelName }
+    val title = remember(nowEvent) { nowEvent?.title.orEmpty() }
     val summary = remember(nowEvent) { nowEvent?.summary?.trim().orEmpty() }
 
     Box(Modifier.fillMaxSize()) {
@@ -108,14 +115,50 @@ fun OverlayControlsTv(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
+                PiconBox(
+                    imageLoader = imageLoader,
+                    piconPath = piconPath,
+                    modifier = Modifier
+                        .width(96.dp)
+                        .height(68.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(Color.White.copy(alpha = 0.10f))
+                        .padding(6.dp),
+                )
+
+                Spacer(Modifier.width(14.dp))
+
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (channelNumber != null) {
+                            Text(
+                                text = channelNumber.toString(),
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier
+                                    .clip(MaterialTheme.shapes.small)
+                                    .background(Color.White.copy(alpha = 0.16f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = channelName,
+                            color = Color.White.copy(alpha = 0.90f),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (title.isNotEmpty()) {
+                        Text(
+                            text = title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     if (summary.isNotEmpty()) {
                         Text(
                             text = summary,
@@ -126,6 +169,8 @@ fun OverlayControlsTv(
                         )
                     }
                 }
+
+                Spacer(Modifier.width(18.dp))
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(clock, color = Color.White, style = MaterialTheme.typography.titleLarge)

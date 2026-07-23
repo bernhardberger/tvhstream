@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil3.ImageLoader
 import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.ConnectionState
@@ -91,6 +92,7 @@ fun VideoPlayerScreen(
     lastPlayedChannelStore: LastPlayedChannelStore = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     channelsVm: ChannelsViewModel = koinViewModel(),
+    imageLoader: ImageLoader = koinInject(),
     channelId: Int,
     channelName: String,
     serviceId: Int,
@@ -241,7 +243,12 @@ fun VideoPlayerScreen(
 
     val nowEvent = remember(epg, nowSec) { epg.nowEvent(nowSec) }
     val nextEvent = remember(epg, nowEvent) { epg.nextAfter(nowEvent) }
-
+    val currentChannel = remember(channels, currentChannelId) {
+        channels.firstOrNull { it.id == currentChannelId }
+    }
+    val currentChannelNumber = remember(channels, currentChannelId) {
+        ChannelNavigation.numberForId(channels.map { it.id }, currentChannelId)
+    }
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) drawerOpen = false
@@ -400,6 +407,7 @@ fun VideoPlayerScreen(
                 selectedId = selectedId,
                 nowSec = nowSec,
                 channelsVm = channelsVm,
+                imageLoader = imageLoader,
                 onFocusChannel = { selectedId = it },
                 onPickChannel = { tuneChannel(it) },
                 focusRequester = drawerFocus,
@@ -415,7 +423,10 @@ fun VideoPlayerScreen(
         ) {
             OverlayControlsTv(
                 player = player,
+                imageLoader = imageLoader,
+                channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
+                piconPath = currentChannel?.icon,
                 nowEvent = nowEvent,
                 nextEvent = nextEvent,
                 nowSec = nowSec,
