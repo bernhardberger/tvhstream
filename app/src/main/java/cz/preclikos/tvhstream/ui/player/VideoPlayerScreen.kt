@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +39,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -59,6 +65,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+
+private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
+private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 
 val topGradient = Brush.verticalGradient(
     0f to Color.Black.copy(alpha = 0.92f),
@@ -102,6 +111,7 @@ fun VideoPlayerScreen(
     var screenActive by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
+    var channelNumberInput by remember { mutableStateOf("") }
     val drawerFocus = remember { FocusRequester() }
 
     val showDrawer = drawerOpen && !controlsVisible
@@ -164,6 +174,7 @@ fun VideoPlayerScreen(
     }
 
     fun tuneChannel(channel: ChannelUi): Boolean {
+        channelNumberInput = ""
         selection.setSelected(channel.id)
         selectedId = channel.id
 
@@ -185,6 +196,31 @@ fun VideoPlayerScreen(
 
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
         return tuneChannel(channel)
+    }
+
+    fun tuneEnteredChannel(): Boolean {
+        if (channelNumberInput.isEmpty()) return false
+
+        val channelId = ChannelNavigation.idForNumber(
+            orderedIds = channels.map { it.id },
+            enteredNumber = channelNumberInput,
+        )
+        channelNumberInput = ""
+
+        val channel = channels.firstOrNull { it.id == channelId }
+        return channel?.let(::tuneChannel) ?: true
+    }
+
+    LaunchedEffect(channelNumberInput) {
+        if (channelNumberInput.isEmpty()) return@LaunchedEffect
+        delay(
+            if (channelNumberInput.length == 3) {
+                COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS
+            } else {
+                CHANNEL_NUMBER_TIMEOUT_MS
+            }
+        )
+        tuneEnteredChannel()
     }
 
     LaunchedEffect(controlsVisible, interactionToken) {
@@ -250,8 +286,29 @@ fun VideoPlayerScreen(
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
+                ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
+                    channelNumberInput = ChannelNavigation.appendDigit(channelNumberInput, digit)
+                    return@onPreviewKeyEvent true
+                }
+
                 ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
+                    channelNumberInput = ""
                     return@onPreviewKeyEvent tuneAdjacentChannel(direction)
+                }
+
+                if (channelNumberInput.isNotEmpty()) {
+                    return@onPreviewKeyEvent when (event.key) {
+                        Key.Enter,
+                        Key.NumPadEnter,
+                        Key.DirectionCenter -> tuneEnteredChannel()
+
+                        Key.Back -> {
+                            channelNumberInput = ""
+                            true
+                        }
+
+                        else -> false
+                    }
                 }
 
                 if (showDrawer) {
@@ -375,6 +432,29 @@ fun VideoPlayerScreen(
                     scope.launch { settingsStore.setAspectRatio(aspectRatio) }
                 }
             )
+        }
+
+        AnimatedVisibility(
+            visible = channelNumberInput.isNotEmpty(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(48.dp)
+        ) {
+            Surface(
+                color = Color.Black.copy(alpha = 0.78f),
+                contentColor = Color.White,
+                shape = MaterialTheme.shapes.large,
+                shadowElevation = 8.dp,
+            ) {
+                Text(
+                    text = channelNumberInput,
+                    fontSize = 56.sp,
+                    style = MaterialTheme.typography.displayMedium,
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
+                )
+            }
         }
     }
 }

@@ -50,4 +50,45 @@ class ChannelNavigationTest {
     fun unrelatedKey_hasNoNavigationDirection() {
         assertNull(ChannelNavigation.directionForKeyCode(KeyEvent.KEYCODE_DPAD_UP))
     }
+
+    @Test
+    fun numberKeys_mapToDigits() {
+        assertEquals(0, ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_0))
+        assertEquals(5, ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_5))
+        assertEquals(9, ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_9))
+        assertEquals(0, ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_NUMPAD_0))
+        assertEquals(5, ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_NUMPAD_5))
+        assertEquals(9, ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_NUMPAD_9))
+    }
+
+    @Test
+    fun unrelatedKey_hasNoDigit() {
+        assertNull(ChannelNavigation.digitForKeyCode(KeyEvent.KEYCODE_DPAD_UP))
+    }
+
+    @Test
+    fun digits_appendUntilThreeDigitLimit() {
+        assertEquals("1", ChannelNavigation.appendDigit("", 1))
+        assertEquals("12", ChannelNavigation.appendDigit("1", 2))
+        assertEquals("123", ChannelNavigation.appendDigit("12", 3))
+    }
+
+    @Test
+    fun digitAfterThreeDigits_startsNewEntry() {
+        assertEquals("4", ChannelNavigation.appendDigit("123", 4))
+    }
+
+    @Test
+    fun enteredNumber_selectsOneBasedVisibleChannel() {
+        assertEquals(10, ChannelNavigation.idForNumber(channels, "1"))
+        assertEquals(20, ChannelNavigation.idForNumber(channels, "2"))
+        assertEquals(30, ChannelNavigation.idForNumber(channels, "003"))
+    }
+
+    @Test
+    fun invalidEnteredNumber_hasNoChannel() {
+        assertNull(ChannelNavigation.idForNumber(channels, "0"))
+        assertNull(ChannelNavigation.idForNumber(channels, "4"))
+        assertNull(ChannelNavigation.idForNumber(channels, ""))
+    }
 }

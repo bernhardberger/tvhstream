@@ -73,11 +73,33 @@ aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 **Files:** navigation helper/test and `VideoPlayerScreen`.  
 **Dependencies:** Task 2.
 
+### Task 3a: Add direct channel-number entry
+
+**Status:** Implemented and verified on the TCL on 2026-07-23.
+
+**Acceptance criteria:**
+
+- Top-row and numpad `0`-`9` key codes build a visible 1- to 3-digit overlay
+  during playback.
+- Entered numbers select the matching 1-based channel shown in the ordered
+  channel list.
+- One- and two-digit entries tune after 1.5 seconds or immediately on OK; a
+  complete three-digit entry remains visible briefly before tuning.
+- Back cancels pending entry, and invalid or out-of-range numbers do not change
+  the current channel.
+
+**Verification:** pure navigation unit tests and physical remote checks with
+1-, 2-, and 3-digit channel numbers.
+
+**Files:** navigation helper/test and `VideoPlayerScreen`.
+**Dependencies:** Task 3.
+
 ### Checkpoint: Channel behavior
 
 - Full unit suite passes and APK builds.
 - Progressive ORF1 and interlaced ServusTV still play.
 - Physical channel buttons work repeatedly.
+- Numeric entry visibly accepts and tunes 1-, 2-, and 3-digit channel numbers.
 
 ## Phase 3: Appliance entry
 

@@ -6,10 +6,10 @@ Turn the GPLv3 TVHStream Android TV client into a single-purpose live-TV
 appliance for a household user who should not need to navigate Google TV.
 
 The app must keep TVHeadend's existing `mberger` account local to the device,
-play the last selected channel after an appliance launch, support the physical
-channel buttons, reclaim TCL's globally intercepted TV/GUIDE button, and enter
-live TV after boot or display wake through a narrowly scoped accessibility
-service.
+play the last selected channel after an appliance launch, support physical
+channel and number buttons, reclaim TCL's globally intercepted TV/GUIDE button,
+and enter live TV after boot or display wake through a narrowly scoped
+accessibility service.
 
 The upstream-shaped channel list, EPG, and settings remain available as an
 operator path. The app must not immediately restart playback after the user
@@ -68,13 +68,14 @@ fun adjacentChannelId(
 
 ## Testing strategy
 
-- Unit-test channel navigation, wrapping, and launch-policy decisions.
+- Unit-test channel navigation, wrapping, number entry, and launch-policy
+  decisions.
 - Run the complete existing JVM unit-test suite and build the APK.
 - Install beside both stock Headent and the temporary upstream-package
   TVHStream diagnostic build.
-- Runtime-test progressive and interlaced playback, `CH+`, `CH-`, persistence
-  across force-stop, normal Back navigation, HOME launch, GUIDE/TV key,
-  standby/wake, and a cold reboot.
+- Runtime-test progressive and interlaced playback, `CH+`, `CH-`, 1- to 3-digit
+  channel entry, persistence across force-stop, normal Back navigation, HOME
+  launch, GUIDE/TV key, standby/wake, and a cold reboot.
 - Treat visible motion quality on an interlaced sports broadcast as a mandatory
   human verification gate.
 
@@ -112,17 +113,19 @@ fun adjacentChannelId(
    TVHStream diagnostic result.
 3. Physical `CH+` and `CH-` switch to adjacent visible channels and wrap at the
    ends of the list.
-4. The last successfully selected channel survives process death and reboot.
-5. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
+4. Physical `0`-`9` keys show a channel-number overlay and select the matching
+   visible channel after 1 to 3 digits.
+5. The last successfully selected channel survives process death and reboot.
+6. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
    and channel data, then plays the persisted channel or the first channel. If
    playback is already visible, the entry intent must not restart it.
-6. Back exits playback to the normal TVHStream UI without an autoplay loop.
-7. The accessibility service ignores every key except Android GUIDE and the
+7. Back exits playback to the normal TVHStream UI without an autoplay loop.
+8. The accessibility service ignores every key except Android GUIDE and the
    captured TCL TV key code, does not subscribe to accessibility events or
    window content, and does not interfere with keys while disabled.
-8. Google Basic TV, Headent, and the diagnostic TVHStream package remain
+9. Google Basic TV, Headent, and the diagnostic TVHStream package remain
    available as rollback paths during validation.
-9. Unit tests pass, the release APK is signed with the stable private key, and
+10. Unit tests pass, the release APK is signed with the stable private key, and
    installed package/signature/version details are recorded without secrets.
 
 ## Open questions
