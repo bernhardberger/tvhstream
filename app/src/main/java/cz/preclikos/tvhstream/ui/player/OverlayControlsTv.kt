@@ -135,10 +135,6 @@ fun OverlayControlsTv(
                                 text = channelNumber.toString(),
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier
-                                    .clip(MaterialTheme.shapes.small)
-                                    .background(Color.White.copy(alpha = 0.16f))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp),
                             )
                             Spacer(Modifier.width(8.dp))
                         }
