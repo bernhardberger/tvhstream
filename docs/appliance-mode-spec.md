@@ -94,6 +94,8 @@ fun adjacentChannelId(
 
 - Keep credentials in app-private storage; never hardcode or commit them.
 - Preserve a route to channel list, EPG, and settings through Back navigation.
+- Keep Settings visually separated at the bottom of the main rail and open it
+  on the reversible Language page, not the connection-credential page.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
 - Use a distinct Leoville application ID and stable signing key.
 - Keep channel ordering, numbering, and playback recovery in the client; do not

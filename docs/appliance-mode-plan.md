@@ -253,6 +253,8 @@ modify TVHeadend accounts, channels, profiles, tuners, or other server state.
   backoff, and explicit playback exit cancels pending recovery.
 - Normal root Back does not call `exitProcess`; EPG and settings retain useful
   Back navigation, and HOME remains available for deliberate app exit.
+- Settings is isolated at the bottom of the main rail and opens on Language;
+  connection credentials require an explicit second navigation choice.
 - The playback controls do not initially focus Stop or another action, while all
   existing player controls remain available.
 

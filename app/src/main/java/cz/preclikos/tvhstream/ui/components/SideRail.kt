@@ -69,7 +69,7 @@ fun SideRail(
     val channelsLabel = stringResource(R.string.navigation_channels)
     val epgLabel = stringResource(R.string.navigation_epg)
     val settingsLabel = stringResource(R.string.navigation_settings)
-    val items = remember(channelsLabel, epgLabel, settingsLabel) {
+    val primaryItems = remember(channelsLabel, epgLabel) {
         listOf(
             RailItem(Routes.CHANNELS, channelsLabel) {
                 Icon(
@@ -79,15 +79,14 @@ fun SideRail(
                 )
             },
             RailItem(Routes.EPG, epgLabel) { Icon(Icons.Filled.Event, null, tint = Color.White) },
-            RailItem(Routes.SETTINGS, settingsLabel) {
-                Icon(
-                    Icons.Filled.Settings,
-                    null,
-                    tint = Color.White
-                )
-            },
         )
     }
+    val settingsItem = remember(settingsLabel) {
+        RailItem(Routes.SETTINGS, settingsLabel) {
+            Icon(Icons.Filled.Settings, null, tint = Color.White)
+        }
+    }
+    val items = remember(primaryItems, settingsItem) { primaryItems + settingsItem }
 
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
 
@@ -110,7 +109,7 @@ fun SideRail(
     ) {
         Spacer(Modifier.height(6.dp))
 
-        items.forEach { item ->
+        primaryItems.forEach { item ->
             val selected = currentRoute == item.route
             SideRailItem(
                 selected = selected,
@@ -126,6 +125,20 @@ fun SideRail(
         }
 
         Spacer(Modifier.weight(1f))
+
+        SideRailItem(
+            selected = currentRoute == settingsItem.route,
+            expanded = railFocused,
+            label = settingsItem.label,
+            icon = settingsItem.icon,
+            focusRequester = itemFocus.getValue(settingsItem.route),
+            onClick = {
+                railFocused = false
+                onNavigate(settingsItem.route)
+            }
+        )
+
+        Spacer(Modifier.height(6.dp))
     }
 }
 

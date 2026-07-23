@@ -46,7 +46,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                 currentRoute = currentRoute,
                 onNavigate = { route ->
                     nav.navigate(route) {
-                        popUpTo(SettingsRoutes.CONNECTION) { inclusive = false }
+                        popUpTo(SettingsRoutes.GENERAL) { inclusive = false }
                         launchSingleTop = true
                         restoreState = true
                     }
@@ -60,7 +60,7 @@ fun SettingsScreen(onClose: () -> Unit) {
             ) {
                 NavHost(
                     navController = nav,
-                    startDestination = SettingsRoutes.CONNECTION,
+                    startDestination = SettingsRoutes.GENERAL,
                 ) {
                     composable(SettingsRoutes.GENERAL) {
                         SettingsLanguage()
