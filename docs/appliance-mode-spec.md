@@ -186,3 +186,16 @@ fun adjacentChannelId(
   `initialSyncCompleted`, so the UI receives one complete channel snapshot rather
   than unstable partial lists (previously observed around 30, 84, and 50 channels).
   Recheck the stable count on the TCL before final appliance deployment.
+- Activity recreation reuses a healthy process-scoped HTSP connection to the same
+  endpoint. A full metadata snapshot is reserved for startup, changed settings,
+  and real reconnects; live channel and EPG changes continue through HTSP deltas.
+- Channel and EPG metadata remain a bounded in-memory cache. Guide top-ups are
+  rate-limited, successful empty ranges are remembered, optional guide timeouts do
+  not tear down the HTSP session, and routine completion does not show a banner.
+- Connection progress and errors are persistent state within the channel screen,
+  with TV-focusable Retry and connection-settings actions where applicable. A
+  same-server reconnect keeps the last complete snapshot visible until its atomic
+  replacement is ready.
+- Normal channel changes do not show a full-screen loading scrim or block D-pad
+  input. Delayed compact tuning feedback is sufficient; full-screen recovery is
+  reserved for a lost HTSP connection or an active playback retry cycle.

@@ -23,6 +23,19 @@
 - Treat initial channel metadata as one atomic snapshot: HTSP control delivery
   applies backpressure instead of dropping messages, and the repository publishes
   channels only after `initialSyncCompleted`.
+- Reuse the process-scoped HTSP session when an activity is recreated with the
+  same server endpoint. Run a full channel snapshot only for process startup,
+  changed connection settings, or genuine connection recovery; apply TVHeadend's
+  asynchronous channel and event changes incrementally afterward.
+- Keep channel and EPG metadata in bounded process memory rather than adding a
+  database or JSON cache without measured startup evidence. EPG queries maintain
+  a 20-24-hour future horizon and six hours of history, count successful empty
+  ranges as queried, observe a per-channel retry cooldown, and cannot disconnect
+  the shared HTSP session when an optional guide request times out.
+- Keep routine channel and EPG synchronization silent. Represent connection
+  progress and actionable failures as typed state integrated into the current TV
+  destination rather than a global transient banner. Preserve the last complete
+  channel/EPG snapshot while a same-server reconnect stages its replacement.
 - Use TV Material for focusable Compose controls. Retain mobile Material only
   for primitives not supplied by TV Material 1.1.0, under one coordinated theme.
 - Use TV Material's standard navigation drawer and list-item geometry on a
@@ -43,6 +56,10 @@
   operator preference for showing the main EPG menu.
 - Retry interrupted playback through the serialized player command gate with
   bounded 1/2/5/10/30-second backoff and visible, Back-cancellable recovery UI.
+- Treat ordinary channel tuning as a non-blocking transition: preserve the video
+  surface and remote input, and show only delayed compact feedback when tuning is
+  slow. Reserve the full-screen recovery scrim for connection loss or actual
+  playback recovery, not every non-playing state.
 - Consume OK and D-pad Down when they reveal hidden playback controls so the same
   key event cannot activate a newly focused control. Treat selection of the
   current playback channel as a drawer-close action rather than a tune request.
