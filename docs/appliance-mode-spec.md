@@ -159,8 +159,8 @@ fun adjacentChannelId(
 10. Unit tests pass, the release APK is signed with the stable private key, and
     installed package/signature/version details are recorded without secrets.
     The strict native release-provenance gate must also pass.
-11. The operator UI can follow the system language or explicitly select German,
-    English, or Czech, and can hide the main EPG menu without disabling playback.
+11. The operator UI can follow the system language or explicitly select German
+    or English, and can hide the main EPG menu without disabling playback.
 
 ## Open questions
 

@@ -6,10 +6,10 @@ import org.junit.Test
 class AppLanguageTest {
     @Test
     fun chooserLanguages_mapToAndroidLanguageTags() {
-        assertEquals("", AppLanguage.SYSTEM.languageTag)
-        assertEquals("de", AppLanguage.GERMAN.languageTag)
-        assertEquals("en", AppLanguage.ENGLISH.languageTag)
-        assertEquals("cs", AppLanguage.CZECH.languageTag)
+        assertEquals(
+            listOf("", "de", "en"),
+            AppLanguage.entries.map { it.languageTag },
+        )
     }
 
     @Test
@@ -18,6 +18,6 @@ class AppLanguageTest {
         assertEquals(AppLanguage.GERMAN, AppLanguage.fromLanguageTags("de"))
         assertEquals(AppLanguage.GERMAN, AppLanguage.fromLanguageTags("de-DE"))
         assertEquals(AppLanguage.ENGLISH, AppLanguage.fromLanguageTags("en-GB"))
-        assertEquals(AppLanguage.CZECH, AppLanguage.fromLanguageTags("cs-CZ"))
+        assertEquals(AppLanguage.SYSTEM, AppLanguage.fromLanguageTags("fr-FR"))
     }
 }

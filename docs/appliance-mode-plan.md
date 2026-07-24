@@ -39,7 +39,7 @@
   Android Keystore-backed store. Release builds expose no importer or component.
 - Preserve TVHeadend channel numbers through the UI and direct-entry policy;
   fall back to one-based positions only for servers with no channel numbers.
-- Support app-specific German, English, and Czech selection and persist the
+- Support app-specific German and English selection and persist the
   operator preference for showing the main EPG menu.
 - Retry interrupted playback through the serialized player command gate with
   bounded 1/2/5/10/30-second backoff and visible, Back-cancellable recovery UI.

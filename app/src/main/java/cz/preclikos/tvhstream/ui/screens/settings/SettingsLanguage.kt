@@ -28,7 +28,6 @@ fun SettingsLanguage() {
         AppLanguage.SYSTEM to stringResource(R.string.language_follow_system),
         AppLanguage.GERMAN to stringResource(R.string.language_german),
         AppLanguage.ENGLISH to stringResource(R.string.language_english),
-        AppLanguage.CZECH to stringResource(R.string.language_czech),
     )
 
     SettingsPane(title = stringResource(R.string.settings_language)) {
