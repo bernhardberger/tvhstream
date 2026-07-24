@@ -63,7 +63,7 @@ fun OverlayControlsTv(
     nextEvent: EpgEventEntry?,
     nowSec: Long,
     controlsVisible: Boolean,
-    onBack: () -> Unit,
+    onStopPlayback: () -> Unit,
     onUserInteraction: () -> Unit,
     aspectRatio: AspectRatioMode,
     onAspectRatioChange: () -> Unit,
@@ -186,7 +186,7 @@ fun OverlayControlsTv(
                     icon = {
                         Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
                     },
-                    onClick = { onUserInteraction(); onBack() },
+                    onClick = { onUserInteraction(); onStopPlayback() },
                     focusRequester = stopFocus,
                     onFocused = { lastFocused = 0 },
                 )

@@ -77,6 +77,14 @@ import org.koin.compose.koinInject
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 
+internal suspend fun stopPlaybackAndClose(
+    stopPlayback: suspend () -> Unit,
+    closePlayer: () -> Unit,
+) {
+    stopPlayback()
+    closePlayer()
+}
+
 val bottomGradient = Brush.verticalGradient(
     0f to Color.Transparent,
     0.35f to Color.Black.copy(alpha = 0.35f),
@@ -466,7 +474,14 @@ fun VideoPlayerScreen(
                 nextEvent = nextEvent,
                 nowSec = nowSec,
                 controlsVisible = controlsVisible,
-                onBack = onClose,
+                onStopPlayback = {
+                    scope.launch {
+                        stopPlaybackAndClose(
+                            stopPlayback = videoPlayerViewModel::stop,
+                            closePlayer = onClose,
+                        )
+                    }
+                },
                 onUserInteraction = { interactionToken++ },
                 aspectRatio = aspectRatio,
                 onAspectRatioChange = {

@@ -8,7 +8,15 @@ class BackNavigationPolicyTest {
     fun rootStartDestinationFinishesActivity() {
         assertEquals(
             BackAction.FINISH_ACTIVITY,
-            rootBackAction(isStartDestination = true),
+            rootBackAction(isStartDestination = true, hasActivePlayback = false),
+        )
+    }
+
+    @Test
+    fun rootStartDestinationReturnsToActivePlayback() {
+        assertEquals(
+            BackAction.RETURN_TO_PLAYER,
+            rootBackAction(isStartDestination = true, hasActivePlayback = true),
         )
     }
 
@@ -16,7 +24,7 @@ class BackNavigationPolicyTest {
     fun rootChildDestinationPopsNavigation() {
         assertEquals(
             BackAction.POP_NAVIGATION,
-            rootBackAction(isStartDestination = false),
+            rootBackAction(isStartDestination = false, hasActivePlayback = true),
         )
     }
 

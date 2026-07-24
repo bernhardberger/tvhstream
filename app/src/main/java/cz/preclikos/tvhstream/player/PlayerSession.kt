@@ -75,6 +75,9 @@ class PlayerSession(
     private val _state = MutableStateFlow<PlaybackSessionState>(PlaybackSessionState.Idle)
     val state: StateFlow<PlaybackSessionState> = _state
 
+    private val _activeServiceId = MutableStateFlow<Int?>(null)
+    val activeServiceId: StateFlow<Int?> = _activeServiceId
+
     private var playWhenReadyState = true
     private var currentItem = 0
     private var playbackPosition = 0L
@@ -158,6 +161,7 @@ class PlayerSession(
                 consecutiveFailures = 0
                 ActivePlayback(appContext, serviceId, ++playbackGeneration).also {
                     activePlayback = it
+                    _activeServiceId.value = serviceId
                     _state.value = PlaybackSessionState.Starting
                 }
             }
@@ -303,6 +307,7 @@ class PlayerSession(
             withContext(NonCancellable) {
                 withContext(Dispatchers.Main.immediate) {
                     activePlayback = null
+                    _activeServiceId.value = null
                     playbackGeneration++
                     consecutiveFailures = 0
                     retryJob?.cancel()
@@ -326,6 +331,7 @@ class PlayerSession(
             withContext(NonCancellable) {
                 withContext(Dispatchers.Main.immediate) {
                     activePlayback = null
+                    _activeServiceId.value = null
                     playbackGeneration++
                     retryJob?.cancel()
                     retryJob = null

@@ -48,6 +48,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         when (nestedBackAction(hasPreviousEntry = nav.previousBackStackEntry != null)) {
             BackAction.POP_NAVIGATION -> nav.popBackStack()
             BackAction.RETURN_TO_PARENT -> onBack()
+            BackAction.RETURN_TO_PLAYER -> Unit
             BackAction.FINISH_ACTIVITY -> Unit
         }
     }

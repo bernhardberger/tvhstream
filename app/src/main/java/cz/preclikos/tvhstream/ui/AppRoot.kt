@@ -77,6 +77,7 @@ fun AppRoot(
     val playerSession: PlayerSession = koinInject()
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playerSession.state.collectAsStateWithLifecycle()
+    val activeServiceId by playerSession.activeServiceId.collectAsStateWithLifecycle()
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
     )
@@ -118,12 +119,28 @@ fun AppRoot(
             return@BackHandler
         }
 
-        when (rootBackAction(isStartDestination = currentRoute == Routes.CHANNELS)) {
+        when (rootBackAction(
+            isStartDestination = currentRoute == Routes.CHANNELS,
+            hasActivePlayback = activeServiceId != null,
+        )) {
             BackAction.FINISH_ACTIVITY -> activity?.finish()
             BackAction.POP_NAVIGATION -> {
                 if (!nav.popBackStack()) activity?.finish()
             }
             BackAction.RETURN_TO_PARENT -> Unit
+            BackAction.RETURN_TO_PLAYER -> {
+                val serviceId = activeServiceId ?: return@BackHandler
+                val channel = channelsVm.channels.value.firstOrNull { it.id == serviceId }
+                nav.navigate(
+                    Routes.player(
+                        channelId = channel?.id ?: serviceId,
+                        serviceId = serviceId,
+                        channelName = channel?.name.orEmpty(),
+                    )
+                ) {
+                    launchSingleTop = true
+                }
+            }
         }
     }
     val content: @Composable () -> Unit = {
