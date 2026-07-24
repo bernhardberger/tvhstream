@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Verify bundled native AAR integrity and Android page-size compatibility."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import struct
+import sys
+import zipfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LIB_DIR = ROOT / "app/libs"
+MANIFEST_PATH = LIB_DIR / "native-dependencies.json"
+PT_LOAD = 1
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_alignments(data: bytes, label: str) -> list[int]:
+    if len(data) < 16 or data[:4] != b"\x7fELF":
+        raise ValueError(f"{label}: not an ELF shared library")
+
+    elf_class = data[4]
+    byte_order = data[5]
+    if byte_order == 1:
+        endian = "<"
+    elif byte_order == 2:
+        endian = ">"
+    else:
+        raise ValueError(f"{label}: unsupported ELF byte order {byte_order}")
+
+    if elf_class == 1:
+        if len(data) < 52:
+            raise ValueError(f"{label}: truncated ELF32 header")
+        ph_offset = struct.unpack_from(f"{endian}I", data, 28)[0]
+        ph_entry_size = struct.unpack_from(f"{endian}H", data, 42)[0]
+        ph_count = struct.unpack_from(f"{endian}H", data, 44)[0]
+        align_offset = 28
+        align_format = "I"
+    elif elf_class == 2:
+        if len(data) < 64:
+            raise ValueError(f"{label}: truncated ELF64 header")
+        ph_offset = struct.unpack_from(f"{endian}Q", data, 32)[0]
+        ph_entry_size = struct.unpack_from(f"{endian}H", data, 54)[0]
+        ph_count = struct.unpack_from(f"{endian}H", data, 56)[0]
+        align_offset = 48
+        align_format = "Q"
+    else:
+        raise ValueError(f"{label}: unsupported ELF class {elf_class}")
+
+    alignments: list[int] = []
+    for index in range(ph_count):
+        entry = ph_offset + index * ph_entry_size
+        if entry + ph_entry_size > len(data):
+            raise ValueError(f"{label}: truncated program-header table")
+        segment_type = struct.unpack_from(f"{endian}I", data, entry)[0]
+        if segment_type == PT_LOAD:
+            alignment = struct.unpack_from(
+                f"{endian}{align_format}", data, entry + align_offset
+            )[0]
+            alignments.append(alignment)
+
+    if not alignments:
+        raise ValueError(f"{label}: ELF has no load segments")
+    return alignments
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="also require complete, explicitly approved source provenance",
+    )
+    args = parser.parse_args()
+
+    try:
+        manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: cannot read {MANIFEST_PATH.relative_to(ROOT)}: {exc}", file=sys.stderr)
+        return 1
+
+    errors: list[str] = []
+    blockers: list[str] = []
+    required_abis = set(manifest["requiredAbis"])
+    minimum_alignment = int(manifest["minimumElfLoadAlignment"])
+    declared_files = {artifact["file"] for artifact in manifest["artifacts"]}
+    actual_files = {path.name for path in LIB_DIR.glob("*.aar")}
+
+    for undeclared in sorted(actual_files - declared_files):
+        errors.append(f"undeclared native AAR: app/libs/{undeclared}")
+    for missing in sorted(declared_files - actual_files):
+        errors.append(f"missing native AAR: app/libs/{missing}")
+
+    for artifact in manifest["artifacts"]:
+        relative = Path("app/libs") / artifact["file"]
+        path = ROOT / relative
+        if not path.is_file():
+            continue
+
+        actual_hash = sha256(path)
+        if actual_hash != artifact["sha256"]:
+            errors.append(
+                f"{relative}: SHA-256 {actual_hash} does not match the audited hash"
+            )
+
+        expected_libraries = set(artifact["librariesPerAbi"])
+        try:
+            with zipfile.ZipFile(path) as archive:
+                native_entries = {
+                    name
+                    for name in archive.namelist()
+                    if name.startswith("jni/") and name.endswith(".so")
+                }
+                found_abis = {name.split("/")[1] for name in native_entries}
+                if found_abis != required_abis:
+                    errors.append(
+                        f"{relative}: ABIs {sorted(found_abis)} do not match "
+                        f"{sorted(required_abis)}"
+                    )
+
+                for abi in sorted(required_abis):
+                    found_libraries = {
+                        name.split("/")[-1]
+                        for name in native_entries
+                        if name.startswith(f"jni/{abi}/")
+                    }
+                    if found_libraries != expected_libraries:
+                        errors.append(
+                            f"{relative}: {abi} libraries {sorted(found_libraries)} "
+                            f"do not match {sorted(expected_libraries)}"
+                        )
+
+                for entry in sorted(native_entries):
+                    try:
+                        alignments = load_alignments(archive.read(entry), f"{relative}!/{entry}")
+                    except ValueError as exc:
+                        errors.append(str(exc))
+                        continue
+                    bad = [value for value in alignments if value < minimum_alignment]
+                    if bad:
+                        errors.append(
+                            f"{relative}!/{entry}: load alignment below "
+                            f"{minimum_alignment}: {bad}"
+                        )
+        except zipfile.BadZipFile as exc:
+            errors.append(f"{relative}: invalid AAR archive: {exc}")
+
+        if not artifact.get("releaseApproved", False):
+            blockers.append(f"{relative}: {artifact['releaseBlocker']}")
+
+    if args.release:
+        errors.extend(f"release provenance incomplete: {blocker}" for blocker in blockers)
+    else:
+        for blocker in blockers:
+            print(f"warning: {blocker}")
+
+    for error in errors:
+        print(f"error: {error}", file=sys.stderr)
+    if errors:
+        return 1
+
+    print(
+        f"Native AAR integrity passed: {len(manifest['artifacts'])} artifacts, "
+        f"{len(required_abis)} ABIs, {minimum_alignment}-byte ELF alignment"
+    )
+    if blockers:
+        print(
+            f"Release remains blocked by incomplete provenance for {len(blockers)} artifacts"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

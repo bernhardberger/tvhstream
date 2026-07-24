@@ -1,6 +1,6 @@
 ---
 name: android-tv-device-testing
-description: Use for Android TV or TCL ADB testing, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics in this TVHStream fork.
+description: Use for Android TV or TCL ADB testing, test-device credential provisioning, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics in this TVHStream fork.
 ---
 
 # Android TV Device Testing
@@ -19,12 +19,18 @@ dumps whenever it supports the required operation.
    address as a required default.
 5. Confirm the package under test. The appliance default is
    `at.leoville.tvhstream`; rollback clients use different package IDs.
+6. Run `./tools/device doctor` and confirm the local role. The household TV must
+   remain `production`. Only a separately assigned target may be `test`, and
+   mutations require matching `expected_manufacturer` and `expected_model`.
 
 ## Safe sequence
+
+The following mutating sequence is available only for a configured test device:
 
 ```bash
 ./tools/device doctor
 ./tools/device install-debug
+./tools/device provision-test-credentials
 ./tools/device force-stop
 ./tools/device launch
 ./tools/device current
@@ -41,6 +47,26 @@ Use named key commands rather than numeric key codes:
 ./tools/device key back
 ./tools/device key power
 ```
+
+For production and unclassified devices, use only bounded diagnostics such as
+`doctor`, `current`, and `package-info`. Do not bypass the role policy with raw
+ADB commands.
+
+## Test credential provisioning
+
+Provision only a designated test device after installing the debug APK. Put the
+credential JSON in the ignored path configured by `credential_file`, set its
+mode to `0600`, and run `./tools/device provision-test-credentials`. The wrapper
+validates role plus live manufacturer/model before reading the secret, streams
+the payload over stdin into the debug app's private directory, suppresses device
+output for that operation, launches the app to consume it, and reports only a
+non-sensitive acknowledgment.
+
+The password is then stored by the existing Android Keystore-backed store. The
+plaintext staging file is deleted whether import succeeds or fails. Delete the
+local secret after provisioning unless it is intentionally retained for repeated
+test setup. See `docs/test-device-credential-provisioning.md` for setup, cleanup,
+threat model, and limitations.
 
 ## Verification matrix
 
@@ -70,5 +96,8 @@ acceptable motion quality.
   files, full `dumpsys`, or unrestricted `logcat` output.
 - Do not type credentials through an uncertain focus state.
 - Do not add exported debug components to inject credentials.
+- Do not pass credential values with `--serial`, `--package`, shell arguments,
+  environment variables, or raw ADB commands. Use only the ignored local secret
+  file and the bounded provisioning command.
 - If a secret appears in output, stop, rotate it, verify the old value is
   rejected, and remove the exposure path before continuing.

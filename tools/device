@@ -13,17 +13,26 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import NoReturn
 
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_CONFIG = ROOT / ".tvhstream-device.json"
 DEFAULT_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
+DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhstream-credentials.json"
+MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
 KEY_EVENTS = {
+    "up": "KEYCODE_DPAD_UP",
+    "down": "KEYCODE_DPAD_DOWN",
+    "left": "KEYCODE_DPAD_LEFT",
+    "right": "KEYCODE_DPAD_RIGHT",
+    "center": "KEYCODE_DPAD_CENTER",
     "channel-up": "KEYCODE_CHANNEL_UP",
     "channel-down": "KEYCODE_CHANNEL_DOWN",
     "guide": "KEYCODE_GUIDE",
@@ -31,9 +40,18 @@ KEY_EVENTS = {
     "back": "KEYCODE_BACK",
     "power": "KEYCODE_POWER",
 }
+MUTATING_ACTIONS = {
+    "install-debug",
+    "launch",
+    "force-stop",
+    "smoke",
+    "key",
+    "provision-test-credentials",
+}
+VALID_ROLES = {"production", "test", "unclassified"}
 
 
-def fail(message: str) -> "NoReturn":
+def fail(message: str) -> NoReturn:
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(2)
 
@@ -55,14 +73,78 @@ def run(
     *,
     capture: bool = False,
     check: bool = True,
+    input_data: str | None = None,
+    sensitive: bool = False,
+    announce: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    print(f"$ {shlex.join(command)}", flush=True)
-    return subprocess.run(
+    if announce:
+        suffix = " <redacted stdin>" if sensitive and input_data is not None else ""
+        print(f"$ {shlex.join(command)}{suffix}", flush=True)
+    result = subprocess.run(
         command,
-        check=check,
+        check=False,
         text=True,
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.PIPE if capture else None,
+        input=input_data,
+        stdout=subprocess.PIPE if capture or sensitive else None,
+        stderr=subprocess.PIPE if capture or sensitive else None,
+    )
+    if check and result.returncode != 0:
+        if sensitive:
+            fail("sensitive device operation failed; device output redacted")
+        detail = (result.stderr or result.stdout or "").strip()
+        fail(f"command failed with exit code {result.returncode}: {detail or 'no output'}")
+    return result
+
+
+def load_credential_payload(path: Path) -> str:
+    try:
+        if path.is_symlink() or not path.is_file():
+            fail(f"credential file is missing or is not a regular file: {path}")
+        file_stat = path.stat()
+        if file_stat.st_uid != os.getuid():
+            fail(f"credential file must be owned by the current user: {path}")
+        mode = stat.S_IMODE(file_stat.st_mode)
+        if mode & (stat.S_IRWXG | stat.S_IRWXO):
+            fail(f"credential file must be accessible only by its owner: {path}")
+        raw = path.read_bytes()
+    except OSError as exc:
+        fail(f"cannot read credential file {path}: {exc.strerror or 'I/O error'}")
+
+    if len(raw) > MAX_CREDENTIAL_FILE_BYTES:
+        fail(f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes")
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        fail("credential file must contain valid UTF-8 JSON")
+    if not isinstance(value, dict):
+        fail("credential file must contain a JSON object")
+
+    host = value.get("host")
+    username = value.get("username")
+    password = value.get("password")
+    port = value.get("htsp_port", 9982)
+    auto_connect = value.get("auto_connect", True)
+    if not isinstance(host, str) or not host.strip() or "\n" in host or "\r" in host:
+        fail("credential file host must be a non-empty single-line string")
+    if not isinstance(username, str) or not username.strip() or "\n" in username or "\r" in username:
+        fail("credential file username must be a non-empty single-line string")
+    if not isinstance(password, str) or not password:
+        fail("credential file password must be a non-empty string")
+    if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+        fail("credential file htsp_port must be an integer from 1 through 65535")
+    if not isinstance(auto_connect, bool):
+        fail("credential file auto_connect must be true or false")
+
+    # Canonicalize the accepted fields so unrelated local data is never staged.
+    return json.dumps(
+        {
+            "host": host.strip(),
+            "htsp_port": port,
+            "username": username.strip(),
+            "password": password,
+            "auto_connect": auto_connect,
+        },
+        separators=(",", ":"),
     )
 
 
@@ -79,6 +161,98 @@ def require_serial(value: str | None) -> str:
     if any(character.isspace() for character in value):
         fail("ADB serial must not contain whitespace")
     return value
+
+
+def mutation_error(role: str, action: str) -> str | None:
+    if action not in MUTATING_ACTIONS:
+        return None
+    if role == "test":
+        return None
+    if role == "production":
+        return (
+            f"{action} is blocked for a production device; configure a separate "
+            "device with role 'test'"
+        )
+    return (
+        f"{action} requires an explicitly classified test device; set role to "
+        "'test' in ignored .tvhstream-device.json"
+    )
+
+
+def identity_errors(
+    *,
+    actual_manufacturer: str,
+    actual_model: str,
+    expected_manufacturer: str | None,
+    expected_model: str | None,
+    require_expected: bool,
+) -> list[str]:
+    errors: list[str] = []
+
+    def configured_value(value: str | None) -> str | None:
+        normalized = value.strip() if value else None
+        if normalized and normalized.casefold().startswith("replace-"):
+            return None
+        return normalized
+
+    expected_manufacturer = configured_value(expected_manufacturer)
+    expected_model = configured_value(expected_model)
+
+    if require_expected and not expected_manufacturer:
+        errors.append("expected_manufacturer is required for mutating test-device actions")
+    if require_expected and not expected_model:
+        errors.append("expected_model is required for mutating test-device actions")
+
+    if expected_manufacturer and actual_manufacturer.casefold() != expected_manufacturer.casefold():
+        errors.append(
+            f"device manufacturer {actual_manufacturer!r} does not match "
+            f"expected {expected_manufacturer!r}"
+        )
+    if expected_model and actual_model.casefold() != expected_model.casefold():
+        errors.append(
+            f"device model {actual_model!r} does not match expected {expected_model!r}"
+        )
+    return errors
+
+
+def require_device_ready(adb: str, serial: str) -> None:
+    state = run(adb_command(adb, serial, "get-state"), capture=True, check=False)
+    if state.returncode != 0 or state.stdout.strip() != "device":
+        detail = (state.stderr or state.stdout).strip()
+        fail(f"device {serial} is not ready: {detail or 'unknown adb state'}")
+
+
+def read_device_properties(adb: str, serial: str) -> dict[str, str]:
+    names = {
+        "manufacturer": "ro.product.manufacturer",
+        "model": "ro.product.model",
+        "android": "ro.build.version.release",
+        "abis": "ro.product.cpu.abilist",
+    }
+    return {
+        label: run(
+            adb_command(adb, serial, "shell", "getprop", property_name),
+            capture=True,
+        ).stdout.strip()
+        for label, property_name in names.items()
+    }
+
+
+def verify_configured_identity(
+    properties: dict[str, str],
+    config: dict[str, str],
+    *,
+    require_expected: bool,
+) -> None:
+    errors = identity_errors(
+        actual_manufacturer=properties["manufacturer"],
+        actual_model=properties["model"],
+        expected_manufacturer=config.get("expected_manufacturer"),
+        expected_model=config.get("expected_model"),
+        require_expected=require_expected,
+    )
+    if errors:
+        fail("; ".join(errors))
 
 
 def show_current_focus(adb: str, serial: str) -> None:
@@ -150,6 +324,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("current", help="Show only the current/focused activity")
     subparsers.add_parser("package-info", help="Show bounded package metadata")
     subparsers.add_parser("smoke", help="Force-stop, launch, and show current focus")
+    subparsers.add_parser(
+        "provision-test-credentials",
+        help="Provision credentials from the configured local secret file into a debug app",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send one approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -174,6 +352,15 @@ def main() -> int:
         or config.get("package")
         or DEFAULT_PACKAGE
     )
+    role = config.get("role", "unclassified").strip().lower()
+    if role not in VALID_ROLES:
+        fail(
+            f"invalid device role {role!r}; expected production, test, or unclassified"
+        )
+
+    policy_error = mutation_error(role, args.action)
+    if policy_error:
+        fail(policy_error)
 
     if args.action == "connect":
         run([adb, "connect", serial])
@@ -181,32 +368,115 @@ def main() -> int:
 
     if args.action == "doctor":
         run([adb, "version"])
-        state = run(adb_command(adb, serial, "get-state"), capture=True, check=False)
-        if state.returncode != 0 or state.stdout.strip() != "device":
-            detail = (state.stderr or state.stdout).strip()
-            fail(f"device {serial} is not ready: {detail or 'unknown adb state'}")
-        property_names = (
-            "ro.product.manufacturer",
-            "ro.product.model",
-            "ro.build.version.release",
-            "ro.product.cpu.abilist",
-        )
-        properties = [
-            run(
-                adb_command(adb, serial, "shell", "getprop", property_name),
-                capture=True,
-            ).stdout.strip()
-            for property_name in property_names
-        ]
+        require_device_ready(adb, serial)
+        properties = read_device_properties(adb, serial)
+        verify_configured_identity(properties, config, require_expected=False)
         print(f"device={serial}")
-        print(f"manufacturer|model|android|abis={'|'.join(properties)}")
+        print(f"role={role}")
+        print(
+            "manufacturer|model|android|abis="
+            f"{properties['manufacturer']}|{properties['model']}|"
+            f"{properties['android']}|{properties['abis']}"
+        )
         return 0
+
+    if args.action in MUTATING_ACTIONS:
+        require_device_ready(adb, serial)
+        properties = read_device_properties(adb, serial)
+        verify_configured_identity(properties, config, require_expected=True)
 
     if args.action == "install-debug":
         apk = args.apk.expanduser().resolve()
         if not apk.is_file():
             fail(f"APK does not exist: {apk}")
         run(adb_command(adb, serial, "install", "-r", str(apk)))
+        return 0
+
+    if args.action == "provision-test-credentials":
+        if package_name != DEFAULT_PACKAGE:
+            fail(
+                "credential provisioning is available only for the debug "
+                f"package {DEFAULT_PACKAGE}"
+            )
+        credential_path = Path(
+            os.environ.get("TVHSTREAM_CREDENTIAL_FILE")
+            or config.get("credential_file")
+            or DEFAULT_CREDENTIAL_FILE
+        ).expanduser()
+        if not credential_path.is_absolute():
+            credential_path = ROOT / credential_path
+        payload = load_credential_payload(credential_path)
+
+        run(adb_command(adb, serial, "shell", "am", "force-stop", package_name))
+        run(
+            adb_command(
+                adb,
+                serial,
+                "exec-in",
+                "run-as",
+                package_name,
+                "sh",
+                "-c",
+                "umask 077; mkdir -p files; "
+                "rm -f files/tvh_test_provisioning.result; "
+                "cat > files/tvh_test_provisioning.json",
+            ),
+            capture=True,
+            input_data=payload,
+            sensitive=True,
+        )
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "monkey",
+                "-p",
+                package_name,
+                "-c",
+                "android.intent.category.LEANBACK_LAUNCHER",
+                "1",
+            )
+        )
+
+        status_command = adb_command(
+            adb,
+            serial,
+            "exec-out",
+            "run-as",
+            package_name,
+            "sh",
+            "-c",
+            "if test -f files/tvh_test_provisioning.result; then "
+            "cat files/tvh_test_provisioning.result; "
+            "elif test -f files/tvh_test_provisioning.json; then printf pending; "
+            "else printf missing; fi",
+        )
+        deadline = time.monotonic() + 10
+        status = "pending"
+        while time.monotonic() < deadline and status == "pending":
+            time.sleep(0.2)
+            result = run(status_command, capture=True, check=False, announce=False)
+            status = result.stdout.strip()
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "run-as",
+                package_name,
+                "rm",
+                "-f",
+                "files/tvh_test_provisioning.json",
+                "files/tvh_test_provisioning.result",
+            ),
+            capture=True,
+            check=False,
+            sensitive=True,
+        )
+        if status != "ok":
+            fail("debug app did not accept the credential payload; no sensitive output shown")
+        print("test-device credentials provisioned into app-private storage")
         return 0
 
     if args.action == "launch":

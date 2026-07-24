@@ -22,8 +22,9 @@ project instructions, agents, skills, and commands.
 | `.opencode/skills/tvhstream-upstream-contribution/` | Upstream sync and contribution boundary workflow |
 | `.opencode/commands/` | `/verify`, `/device-check`, and `/upstream-review` shortcuts |
 | `tools/check-ai-harness` | Static harness/config validation plus OpenCode parser check |
-| `tools/verify` | JVM tests, debug assembly, and APK identity/ABI gate |
-| `tools/device` | Bounded ADB wrapper that avoids secret-bearing broad dumps |
+| `tools/verify` | Native/tool/JVM/lint/Android-test compilation, debug assembly, APK identity/ABI, and 16 KB gate |
+| `tools/check-native-libs` | Audited AAR hashes, ABI/ELF checks, and a strict release-provenance gate |
+| `tools/device` | Role-aware bounded ADB wrapper that blocks production mutations, safely provisions designated test devices, and avoids secret-bearing broad dumps |
 
 The project intentionally does not pin an AI provider or model. It inherits the
 operator's OpenCode provider configuration while keeping project behavior and
@@ -33,10 +34,17 @@ Automatic/background subagents are disabled. To get an independent review,
 switch directly to `android-reviewer` or run `/upstream-review` rather than
 having the implementation agent spawn another session.
 
+The harness treats Compose for TV as the focusable UI default, the accepted
+Media3/HTSP path as a regression boundary, incomplete native provenance as a
+signed-release blocker, and read-only GitHub CI as the only enabled automation
+until signing and publication are separately approved.
+
 ## Local device configuration
 
 Copy the tracked example to the ignored local file and set the current ADB
-serial:
+serial. Keep `role` set to `production` for the household TV. Only a separately
+assigned development target may use `role: "test"`; test-device mutations also
+require exact `expected_manufacturer` and `expected_model` values:
 
 ```bash
 cp .tvhstream-device.example.json .tvhstream-device.json
@@ -48,8 +56,18 @@ The same value can be supplied without a file:
 export TVHSTREAM_ADB_SERIAL='<adb-serial>'
 ```
 
-The device file contains no TVHeadend credentials. Credentials remain only in
-Android app-private storage and must never be passed through these tools.
+An environment or command-line serial does not override the role policy from
+the local file. `doctor`, `current`, and `package-info` are available for
+production or unclassified targets. Debug install, launch, force-stop, smoke,
+and synthetic-key operations are rejected unless the configured role is
+`test` and the live manufacturer/model match the local expectations.
+
+The device file contains no TVHeadend credential values. For a designated test
+device only, it may name an ignored owner-only `credential_file`; the bounded
+`provision-test-credentials` command streams that file over stdin to a debug-only
+app-private importer after role and identity validation. Production and
+unclassified devices are always rejected. See
+`docs/test-device-credential-provisioning.md` for setup and cleanup.
 
 ## Validation
 
