@@ -49,6 +49,11 @@
 - Keep the active service warm while Back exposes the foreground Channel List.
   A same-service player request is idempotent, while `MainActivity.onStop` remains
   the hard boundary that stops playback for HOME or other background transitions.
+- At the root Channel List, route Back to the warm fullscreen player when one
+  exists. Preserve normal Android root exit when playback is idle rather than
+  adding a routine confirmation dialog or non-standard Quit menu item.
+- Treat the player Stop control as explicit serialized teardown: await the stop
+  command before leaving the player route so navigation cannot cancel cleanup.
 - Mount the Media3 `PlayerView` at the app root so operator screens retain live
   video as well as audio under a dark navigation scrim. Player controls remain a
   player-route concern; navigation does not detach or recreate the stream surface.
@@ -181,6 +186,8 @@ interlaced-motion regression check.
   then navigate to the persisted/first channel.
 - A new request while settings/channel UI is visible starts playback.
 - Back from player returns to UI and does not autoplay again.
+- Back from the root Channel List returns to warm playback without retuning;
+  root Back with no active playback exits normally.
 
 **Verification:** launch-policy unit tests and ADB launch/Back/force-stop tests.
 
@@ -259,6 +266,55 @@ and an approved cold reboot with enabled-service and app-op state rechecked.
 - CH+/CH- work in live playback.
 - Back still reaches operator UI.
 - Google Basic TV and both rollback clients still launch directly.
+
+## Future profile: Simple TV mode
+
+Use **Simple TV mode** as the user-facing name and a restricted appliance
+profile as the internal concept. Do not call the first implementation Android
+kiosk mode: Android lock-task/device-owner kiosk behavior controls the whole
+device, can suppress HOME and other apps, and conflicts with the current
+reversibility and rollback requirements.
+
+Simple TV mode is an app-level navigation and capability profile:
+
+- Persist whether the profile is enabled and enter live TV on startup using the
+  existing one-shot launch and last-played-channel policies.
+- Define allowed destinations centrally with pure policy, initially live TV and
+  the Channel List. Make EPG optional and add future recordings or other
+  features as independent capabilities rather than scattered visibility flags.
+- Remove unavailable destinations from navigation and focus traversal. Do not
+  leave disabled or dead focus targets, and do not rely only on hiding buttons;
+  route guards must reject disallowed deep or restored destinations too.
+- Keep Back inside the profile: fullscreen playback returns to the allowed
+  operator UI, and root UI returns to warm playback. Stopping playback may show
+  the allowed Channel List, but must not silently unlock the full app.
+- Provide a visible **Unlock controls** action in the restricted navigation
+  surface. Unlock the full UI for the current foreground session; the profile
+  becomes restricted again on the next fresh launch.
+- Offer an optional owner PIN for households that need child resistance. Treat
+  it as protection against casual UI access, not as a security boundary. Avoid
+  hidden key sequences or long-press-only escape gestures.
+- Allow permanent disable only from the full settings UI after unlocking. Keep
+  normal Android Back exit available in the full profile and retain Google TV
+  plus rollback clients.
+
+Suggested implementation slices:
+
+1. Add a JVM-tested `UiCapabilities`/profile policy and persisted profile store.
+2. Add full-settings controls for enabled state and optional EPG/future feature
+   capabilities, plus an explicit action to enter Simple TV mode now.
+3. Enforce the route allowlist and deterministic startup/Back/focus behavior.
+4. Add session-only Unlock controls, then optional local PIN verification.
+5. Validate cold launch, stop, Back, HOME, wake, reboot, long labels, and every
+   enabled/disabled capability on the physical TV.
+
+Open product choices before implementation:
+
+- Whether EPG is enabled by default in Simple TV mode.
+- Whether Stop remains visible, and what idle screen it should reveal.
+- Whether an owner PIN is required, optional, or omitted for the first slice.
+- Whether the eventual public name is Simple TV mode, Restricted mode, or an
+  appliance profile under the final product identity.
 
 ## Phase 5: Durable release and deployment
 

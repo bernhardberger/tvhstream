@@ -149,17 +149,22 @@ fun adjacentChannelId(
    playback is already visible, the entry intent must not restart it.
 7. Back reveals the normal TVHStream UI without an autoplay loop and keeps the
    foreground live session and video surface warm behind a readable navigation
-   scrim. Selecting the same channel returns to playback without retuning;
-   leaving the activity stops the session.
-8. The accessibility service ignores every key except Android GUIDE and the
+   scrim. Back from the root Channel List returns to that fullscreen session,
+   and selecting the same channel does so without retuning. Root Back exits to
+   Google TV normally when no playback is active; leaving the activity stops the
+   session.
+8. The player Stop control completes serialized playback teardown before it
+   returns to the operator UI. It must not leave a warm session that redirects
+   root Back to playback.
+9. The accessibility service ignores every key except Android GUIDE and the
    captured TCL TV key code, does not subscribe to accessibility events or
    window content, and does not interfere with keys while disabled.
-9. Google Basic TV, Headent, and the diagnostic TVHStream package remain
+10. Google Basic TV, Headent, and the diagnostic TVHStream package remain
    available as rollback paths during validation.
-10. Unit tests pass, the release APK is signed with the stable private key, and
+11. Unit tests pass, the release APK is signed with the stable private key, and
     installed package/signature/version details are recorded without secrets.
     The strict native release-provenance gate must also pass.
-11. The operator UI can follow the system language or explicitly select German
+12. The operator UI can follow the system language or explicitly select German
     or English, and can hide the main EPG menu without disabling playback.
 
 ## Open questions
