@@ -7,7 +7,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -216,6 +219,7 @@ class HtspService(
         val s = seq.getAndIncrement()
         val def = CompletableDeferred<HtspMessage>()
         pending[s] = PendingReq(def, System.currentTimeMillis())
+        val requestSocket = socket
 
         val out = output ?: run {
             pending.remove(s)
@@ -240,17 +244,19 @@ class HtspService(
 
         return try {
             withTimeout(timeoutMs) { def.await() }
-        } catch (t: Throwable) {
+        } catch (t: TimeoutCancellationException) {
             pending.remove(s)
 
             if (disconnectOnTimeout) {
-                failAll(SocketTimeoutException("HTSP request '$method' timed out after ${timeoutMs}ms").apply {
-                    initCause(
-                        t
-                    )
-                })
+                closeSocket(requestSocket)
+                throw SocketTimeoutException(
+                    "HTSP request '$method' timed out after ${timeoutMs}ms"
+                ).apply { initCause(t) }
             }
 
+            throw t
+        } catch (t: Throwable) {
+            pending.remove(s)
             throw t
         }
     }
@@ -340,6 +346,7 @@ class HtspService(
             failAll(EOFException("Broken/EOF HTSP stream").apply { initCause(t) })
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
+            if (!currentCoroutineContext().isActive) return
             failAll(t)
         }
     }
@@ -361,48 +368,8 @@ class HtspService(
     }
 
     private suspend fun disconnectInternal(t: Throwable) {
-        val defs = pending.values.toList()
-        pending.clear()
-        defs.forEach { it.def.completeExceptionally(t) }
-
-        initialSyncDef?.completeExceptionally(t)
-        initialSyncDef = null
-
-        val job = readerJob
-        readerJob = null
-        job?.cancel()
-        val self = currentCoroutineContext()[Job]
-        if (job != null && job !== self) {
-            job.join()
-        }
-
-        try {
-            socket?.close()
-        } catch (_: Throwable) {
-        }
-        try {
-            input?.close()
-        } catch (_: Throwable) {
-        }
-        try {
-            output?.close()
-        } catch (_: Throwable) {
-        }
-
-        input = null
-        output = null
-        socket = null
-        challenge = null
-        negotiatedHtspVersion = null
-
-        _state.value = ConnectionState.Disconnected
-    }
-
-    private suspend fun failAll(t: Throwable) {
-        connectMutex.withLock {
-            _state.value = ConnectionState.Error(t)
-            controlEventStream.emit(HtspEvent.ConnectionError(t))
-
+        val callerJob = currentCoroutineContext()[Job]
+        withContext(NonCancellable) {
             val defs = pending.values.toList()
             pending.clear()
             defs.forEach { it.def.completeExceptionally(t) }
@@ -412,36 +379,41 @@ class HtspService(
 
             val job = readerJob
             readerJob = null
-            job?.cancel()
+            if (job != null && job !== callerJob) job.cancel()
 
-            val self = currentCoroutineContext()[Job]
-            if (job != null && job !== self) {
-                try {
-                    job.join()
-                } catch (_: Throwable) {
-                }
-            }
+            // Socket reads are blocking. Closing the transport is what makes a
+            // cancelled reader observable; joining first can wait forever.
+            closeTransport()
+            if (job != null && job !== callerJob) job.join()
 
-            try {
-                socket?.close()
-            } catch (_: Throwable) {
-            }
-            try {
-                input?.close()
-            } catch (_: Throwable) {
-            }
-            try {
-                output?.close()
-            } catch (_: Throwable) {
-            }
-
-            input = null
-            output = null
-            socket = null
             challenge = null
             negotiatedHtspVersion = null
-
             _state.value = ConnectionState.Disconnected
         }
+    }
+
+    private suspend fun failAll(t: Throwable) {
+        connectMutex.withLock {
+            _state.value = ConnectionState.Error(t)
+            controlEventStream.emit(HtspEvent.ConnectionError(t))
+            disconnectInternal(t)
+        }
+    }
+
+    private fun closeTransport() {
+        val currentSocket = socket
+        val currentInput = input
+        val currentOutput = output
+        socket = null
+        input = null
+        output = null
+
+        closeSocket(currentSocket)
+        runCatching { currentInput?.close() }
+        runCatching { currentOutput?.close() }
+    }
+
+    private fun closeSocket(target: Socket?) {
+        runCatching { target?.close() }
     }
 }

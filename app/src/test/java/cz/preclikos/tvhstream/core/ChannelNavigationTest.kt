@@ -8,6 +8,7 @@ import org.junit.Test
 class ChannelNavigationTest {
 
     private val channels = listOf(10, 20, 30)
+    private val channelNumbers = mapOf(10 to 1, 20 to 2, 30 to 4)
 
     @Test
     fun next_returnsFollowingChannel() {
@@ -79,23 +80,35 @@ class ChannelNavigationTest {
     }
 
     @Test
-    fun enteredNumber_selectsOneBasedVisibleChannel() {
-        assertEquals(10, ChannelNavigation.idForNumber(channels, "1"))
-        assertEquals(20, ChannelNavigation.idForNumber(channels, "2"))
-        assertEquals(30, ChannelNavigation.idForNumber(channels, "003"))
+    fun enteredNumber_selectsTvheadendChannelNumber() {
+        assertEquals(10, ChannelNavigation.idForNumber(channels, channelNumbers, "1"))
+        assertEquals(20, ChannelNavigation.idForNumber(channels, channelNumbers, "2"))
+        assertEquals(30, ChannelNavigation.idForNumber(channels, channelNumbers, "004"))
     }
 
     @Test
     fun invalidEnteredNumber_hasNoChannel() {
-        assertNull(ChannelNavigation.idForNumber(channels, "0"))
-        assertNull(ChannelNavigation.idForNumber(channels, "4"))
-        assertNull(ChannelNavigation.idForNumber(channels, ""))
+        assertNull(ChannelNavigation.idForNumber(channels, channelNumbers, "0"))
+        assertNull(ChannelNavigation.idForNumber(channels, channelNumbers, "3"))
+        assertNull(ChannelNavigation.idForNumber(channels, channelNumbers, ""))
     }
 
     @Test
-    fun channelNumber_isOneBasedPositionInVisibleChannels() {
-        assertEquals(1, ChannelNavigation.numberForId(channels, 10))
-        assertEquals(3, ChannelNavigation.numberForId(channels, 30))
-        assertNull(ChannelNavigation.numberForId(channels, 99))
+    fun channelNumber_usesTvheadendChannelNumber() {
+        assertEquals(1, ChannelNavigation.numberForId(channels, channelNumbers, 10))
+        assertEquals(4, ChannelNavigation.numberForId(channels, channelNumbers, 30))
+        assertNull(ChannelNavigation.numberForId(channels, channelNumbers, 99))
+    }
+
+    @Test
+    fun missingTvheadendNumber_isNotAssignedAConflictingPosition() {
+        assertNull(ChannelNavigation.numberForId(channels, channelNumbers - 20, 20))
+        assertNull(ChannelNavigation.idForNumber(channels, channelNumbers - 20, "3"))
+    }
+
+    @Test
+    fun serversWithoutChannelNumbers_fallBackToOneBasedPositions() {
+        assertEquals(20, ChannelNavigation.idForNumber(channels, emptyMap(), "2"))
+        assertEquals(3, ChannelNavigation.numberForId(channels, emptyMap(), 30))
     }
 }

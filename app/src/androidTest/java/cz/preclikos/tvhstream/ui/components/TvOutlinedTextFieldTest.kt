@@ -1,7 +1,6 @@
 package cz.preclikos.tvhstream.ui.components
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import cz.preclikos.tvhstream.ui.TVHStreamTheme
 import org.junit.Rule
 import org.junit.Test
 
@@ -36,7 +36,7 @@ class TvOutlinedTextFieldTest {
         composeTestRule.setContent {
             var editingId by remember { mutableStateOf<String?>(null) }
             var value by remember { mutableStateOf("") }
-            MaterialTheme {
+            TVHStreamTheme {
                 Column {
                     TvOutlinedTextField(
                         id = "host",

@@ -1,5 +1,6 @@
 package cz.preclikos.tvhstream.ui.player
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -10,17 +11,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -39,19 +35,29 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.SurfaceDefaults
+import androidx.tv.material3.Text
 import coil3.ImageLoader
+import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ChannelNavigation
+import cz.preclikos.tvhstream.core.ChannelPickAction
+import cz.preclikos.tvhstream.core.MediaPlaybackAction
+import cz.preclikos.tvhstream.core.channelPickAction
+import cz.preclikos.tvhstream.core.mediaPlaybackAction
+import cz.preclikos.tvhstream.core.shouldRevealPlaybackControls
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.ConnectionState
+import cz.preclikos.tvhstream.player.PlaybackSessionState
 import cz.preclikos.tvhstream.settings.AspectRatioMode
 import cz.preclikos.tvhstream.settings.PlayerSettings
 import cz.preclikos.tvhstream.settings.PlayerSettingsStore
@@ -60,6 +66,7 @@ import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.ui.common.nextAfter
 import cz.preclikos.tvhstream.ui.common.nowEvent
 import cz.preclikos.tvhstream.ui.components.KeepScreenOn
+import cz.preclikos.tvhstream.ui.components.TvRecoveryOverlay
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import cz.preclikos.tvhstream.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.delay
@@ -69,13 +76,6 @@ import org.koin.compose.koinInject
 
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
-
-val topGradient = Brush.verticalGradient(
-    0f to Color.Black.copy(alpha = 0.92f),
-    0.35f to Color.Black.copy(alpha = 0.70f),
-    0.70f to Color.Black.copy(alpha = 0.35f),
-    1f to Color.Transparent
-)
 
 val bottomGradient = Brush.verticalGradient(
     0f to Color.Transparent,
@@ -100,13 +100,16 @@ fun VideoPlayerScreen(
 ) {
     val scope = rememberCoroutineScope()
 
-    val settings by settingsStore.playerSettings.collectAsState(
-        initial = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
+    val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
+        initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
     )
 
-    val connState by videoPlayerViewModel.connectionState.collectAsState()
-    val channels by channelsVm.channels.collectAsState()
-    val selectedInitId by selection.selectedId.collectAsState()
+    val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
+    val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
+    val channels by channelsVm.channels.collectAsStateWithLifecycle()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
+    val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
     var selectedId by remember { mutableIntStateOf(selectedInitId) }
 
     var connectionLost by remember { mutableStateOf(false) }
@@ -146,7 +149,6 @@ fun VideoPlayerScreen(
     var lastPlayedServiceId by remember { mutableIntStateOf(-1) }
     LaunchedEffect(screenActive, currentServiceId) {
         if (!screenActive) {
-            videoPlayerViewModel.stop()
             lastPlayedServiceId = -1
             return@LaunchedEffect
         }
@@ -157,8 +159,13 @@ fun VideoPlayerScreen(
             videoPlayerViewModel.stop()
         }
         videoPlayerViewModel.playService(ctx, currentServiceId)
-        lastPlayedChannelStore.setChannelId(currentChannelId)
         lastPlayedServiceId = currentServiceId
+    }
+
+    LaunchedEffect(playbackState, currentChannelId) {
+        if (playbackState is PlaybackSessionState.Playing) {
+            lastPlayedChannelStore.setChannelId(currentChannelId)
+        }
     }
 
     KeepScreenOn(enabled = true)
@@ -180,6 +187,11 @@ fun VideoPlayerScreen(
         selection.setSelected(channel.id)
         selectedId = channel.id
 
+        if (channelPickAction(currentChannelId, channel.id) == ChannelPickAction.CLOSE_DRAWER) {
+            drawerOpen = false
+            return true
+        }
+
         currentChannelId = channel.id
         currentServiceId = channel.id
         currentChannelName = channel.name
@@ -191,7 +203,7 @@ fun VideoPlayerScreen(
 
     fun tuneAdjacentChannel(direction: Int): Boolean {
         val adjacentId = ChannelNavigation.adjacentId(
-            orderedIds = channels.map { it.id },
+            orderedIds = orderedChannelIds,
             currentId = currentChannelId,
             direction = direction,
         ) ?: return false
@@ -204,7 +216,8 @@ fun VideoPlayerScreen(
         if (channelNumberInput.isEmpty()) return false
 
         val channelId = ChannelNavigation.idForNumber(
-            orderedIds = channels.map { it.id },
+            orderedIds = orderedChannelIds,
+            channelNumbers = channelNumbers,
             enteredNumber = channelNumberInput,
         )
         channelNumberInput = ""
@@ -231,7 +244,7 @@ fun VideoPlayerScreen(
         hideControls()
     }
 
-    val epg by videoPlayerViewModel.epgForChannel(currentChannelId).collectAsState()
+    val epg by videoPlayerViewModel.epgForChannel(currentChannelId).collectAsStateWithLifecycle()
 
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
     LaunchedEffect(Unit) {
@@ -247,15 +260,26 @@ fun VideoPlayerScreen(
         channels.firstOrNull { it.id == currentChannelId }
     }
     val currentChannelNumber = remember(channels, currentChannelId) {
-        ChannelNavigation.numberForId(channels.map { it.id }, currentChannelId)
+        ChannelNavigation.numberForId(
+            orderedChannelIds,
+            channelNumbers,
+            currentChannelId,
+        )
     }
+    val recoveryVisible = screenActive && (
+        connState !is ConnectionState.Connected ||
+            playbackState !is PlaybackSessionState.Playing
+        )
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) drawerOpen = false
     }
 
     LaunchedEffect(showDrawer) {
-        if (showDrawer) drawerFocus.requestFocus()
+        if (showDrawer) {
+            delay(200L)
+            drawerFocus.requestFocus()
+        }
     }
 
     LaunchedEffect(connState, screenActive) {
@@ -289,9 +313,27 @@ fun VideoPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .focusable()
-            .background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+                val mediaAction = mediaPlaybackAction(
+                    keyCode = event.nativeKeyEvent.keyCode,
+                    playKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
+                    pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
+                    toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                )
+                if (mediaAction != MediaPlaybackAction.NONE) {
+                    when (mediaAction) {
+                        MediaPlaybackAction.PLAY -> player.play()
+                        MediaPlaybackAction.PAUSE -> player.pause()
+                        MediaPlaybackAction.TOGGLE -> {
+                            if (player.playWhenReady) player.pause() else player.play()
+                        }
+                        MediaPlaybackAction.NONE -> Unit
+                    }
+                    showControls()
+                    return@onPreviewKeyEvent true
+                }
 
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
                     channelNumberInput = ChannelNavigation.appendDigit(channelNumberInput, digit)
@@ -318,6 +360,20 @@ fun VideoPlayerScreen(
                     }
                 }
 
+                if (recoveryVisible) {
+                    when (event.key) {
+                        Key.Enter,
+                        Key.NumPadEnter,
+                        Key.DirectionCenter,
+                        Key.DirectionLeft,
+                        Key.DirectionRight,
+                        Key.DirectionUp,
+                        Key.DirectionDown -> return@onPreviewKeyEvent true
+
+                        else -> Unit
+                    }
+                }
+
                 if (showDrawer) {
                     return@onPreviewKeyEvent when (event.key) {
                         Key.DirectionRight,
@@ -330,10 +386,19 @@ fun VideoPlayerScreen(
                     }
                 }
 
+                if (shouldRevealPlaybackControls(
+                        controlsVisible = controlsVisible,
+                        keyCode = event.nativeKeyEvent.keyCode,
+                    )
+                ) {
+                    showControls()
+                    return@onPreviewKeyEvent true
+                }
+
                 when (event.key) {
                     Key.DirectionLeft -> {
                         if (!controlsVisible) {
-                            selectedId = selectedInitId
+                            selectedId = currentChannelId
                             drawerOpen = true
                             true
                         } else false
@@ -364,36 +429,6 @@ fun VideoPlayerScreen(
                 }
             }
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            AndroidView(
-                factory = { context ->
-                    PlayerView(context).apply {
-                        this.player = player
-                        useController = false
-                        controllerAutoShow = false
-                        keepScreenOn = true
-                    }
-                },
-                update = { view ->
-                    view.resizeMode = when (aspectRatio) {
-                        AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        AspectRatioMode.FORCE_16_9,
-                        AspectRatioMode.FORCE_4_3 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                    }
-                },
-                modifier = Modifier
-                    .then(
-                        when (aspectRatio) {
-                            AspectRatioMode.FIT -> Modifier.fillMaxSize()
-                            AspectRatioMode.FORCE_16_9 -> Modifier.aspectRatio(16f / 9f)
-                            AspectRatioMode.FORCE_4_3 -> Modifier.aspectRatio(4f / 3f)
-                        }
-                    )
-            )
-        }
         AnimatedVisibility(
             visible = showDrawer,
             enter = slideInHorizontally(tween(180)) { -it },
@@ -454,10 +489,11 @@ fun VideoPlayerScreen(
                 .padding(48.dp)
         ) {
             Surface(
-                color = Color.Black.copy(alpha = 0.78f),
-                contentColor = Color.White,
+                colors = SurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.78f),
+                    contentColor = Color.White,
+                ),
                 shape = MaterialTheme.shapes.large,
-                shadowElevation = 8.dp,
             ) {
                 Text(
                     text = channelNumberInput,
@@ -467,5 +503,17 @@ fun VideoPlayerScreen(
                 )
             }
         }
+
+        TvRecoveryOverlay(
+            visible = recoveryVisible,
+            message = stringResource(
+                when {
+                    connState !is ConnectionState.Connected -> R.string.player_connection_recovering
+                    playbackState is PlaybackSessionState.Recovering -> R.string.player_playback_recovering
+                    else -> R.string.player_starting_channel
+                }
+            ),
+            opaque = false,
+        )
     }
 }

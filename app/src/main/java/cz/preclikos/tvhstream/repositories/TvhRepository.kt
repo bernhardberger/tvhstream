@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -130,7 +131,7 @@ class TvhRepository(
     // EPG store
     // ---------------------------
 
-    private val epgByChannel = mutableMapOf<Int, MutableStateFlow<List<EpgEventEntry>>>()
+    private val epgByChannel = ConcurrentHashMap<Int, MutableStateFlow<List<EpgEventEntry>>>()
     fun epgForChannel(channelId: Int): StateFlow<List<EpgEventEntry>> =
         epgByChannel.getOrPut(channelId) { MutableStateFlow(emptyList()) }
 
@@ -339,13 +340,13 @@ class TvhRepository(
 
             stateMutex.withLock {
                 // ingest + update coverage from reply
-                val ingest = ingestGetEventsReplyLocked(reply, nowSec = nowSec)
+                ingestGetEventsReplyLocked(reply, nowSec = nowSec)
                 // mark refresh time even if ingest returned 0 (so we don't spin)
                 epgCoverage.getOrPut(channelId) { EpgCoverage() }.lastRefreshSec = nowSec
 
                 // Aggressive trimming pass (keeps cache in bounds)
                 trimAllEpgLocked(nowSec)
-                return ingest.totalEvents > 0 || true
+                return true
             }
         } finally {
             stateMutex.withLock { epgInFlight.remove(channelId) }
@@ -462,7 +463,7 @@ class TvhRepository(
     }
 
     private fun publishChannelsLocked(channels: List<ChannelMetadata>) {
-        _channelsUi.value = channels.map { ChannelUi(it.id, it.name, it.icon) }
+        _channelsUi.value = channels.map { ChannelUi(it.id, it.name, it.number, it.icon) }
     }
 
     // ---------------------------

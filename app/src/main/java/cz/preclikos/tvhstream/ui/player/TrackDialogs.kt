@@ -10,11 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,6 +17,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.tv.material3.Button
+import androidx.tv.material3.Icon
+import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.Text
 import cz.preclikos.tvhstream.R
 
 /**
@@ -75,7 +74,7 @@ fun AudioTrackDialog(player: Player, onDismiss: () -> Unit) {
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
         }
@@ -121,7 +120,7 @@ fun SubtitleTrackDialog(player: Player, onDismiss: () -> Unit) {
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
         }

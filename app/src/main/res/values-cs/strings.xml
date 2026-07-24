@@ -1,5 +1,8 @@
 <resources>
     <string name="channel_list">Seznam kanálů</string>
+    <string name="nav_channels">Kanály</string>
+    <string name="nav_epg">Program</string>
+    <string name="nav_settings">Nastavení</string>
 
     <string name="player_ends_in">Končí v: %1$s</string>
     <string name="player_next_event">Následuje: %1$s</string>
@@ -15,13 +18,31 @@
 
     <!-- Settings screen -->
     <string name="settings_server">Nastavení – Připojení</string>
+    <string name="settings_language">Nastavení – Jazyk</string>
+    <string name="settings_language_nav">Jazyk</string>
+    <string name="settings_options">Nastavení – Možnosti</string>
+    <string name="settings_options_nav">Možnosti</string>
+    <string name="show_epg_menu">Zobrazit programovou nabídku</string>
+    <string name="show_epg_menu_enabled">Zobrazit programovou nabídku: Zapnuto</string>
+    <string name="show_epg_menu_disabled">Zobrazit programovou nabídku: Vypnuto</string>
     <string name="host">Host</string>
     <string name="port_htsp">Htsp Port</string>
     <string name="port_http">Http Port</string>
     <string name="username">Uživatelské jméno</string>
     <string name="password">Heslo</string>
+    <string name="password_replacement_hint">Uložené heslo se nikdy nezobrazuje. Novou hodnotu zadejte pouze při jeho změně.</string>
+    <string name="clear_saved_password">Smazat uložené heslo</string>
+    <string name="credential_save_failed">Přihlašovací údaj se nepodařilo uložit. Smažte jej a zadejte znovu.</string>
+    <string name="credential_unavailable">Uložený přihlašovací údaj není dostupný. Otevřete nastavení připojení a zadejte jej znovu.</string>
 
     <string name="settings_player">Nastavení – Přehrávač</string>
+    <string name="settings_connection_nav">Připojení</string>
+    <string name="settings_player_nav">Přehrávač</string>
+    <string name="settings_appliance_nav">Spouštění TV</string>
+    <string name="language_follow_system">Podle systému</string>
+    <string name="language_german">Němčina</string>
+    <string name="language_english">Angličtina</string>
+    <string name="language_czech">Čeština</string>
     <string name="profile">Profil</string>
     <string name="audio_language">Jazyk zvuku</string>
     <string name="subtitle_language">Jazyk titulků</string>
@@ -33,6 +54,13 @@
     <string name="open_accessibility_settings">Otevřít nastavení přístupnosti</string>
     <string name="appliance_accessibility_service_label">Spouštění Leoville TV</string>
     <string name="appliance_accessibility_service_description">Otevírá Leoville TV při spuštění a probuzení a mapuje pouze tlačítko TV/PROGRAM. Nemůže číst obsah obrazovky.</string>
+    <string name="appliance_starting_tv">Spouštím televizi…</string>
+    <string name="appliance_connection_recovering">Televize momentálně není dostupná. Připojení se automaticky obnovuje…</string>
+    <string name="appliance_back_for_menu">Tlačítko Zpět otevře kanály a nastavení.</string>
+
+    <string name="player_starting_channel">Spouštím kanál…</string>
+    <string name="player_connection_recovering">Připojení bylo přerušeno. Automaticky se obnovuje…</string>
+    <string name="player_playback_recovering">Přehrávání bylo přerušeno. Automaticky to zkouším znovu…</string>
 
     <string name="loading_wait">Načítání čeká…</string>
     <string name="not_connected">Nepřipojeno</string>
@@ -60,6 +88,7 @@
 
     <!-- Common -->
     <string name="close">Zavřít</string>
+    <string name="stop_playback">Zastavit přehrávání</string>
 
     <!-- ===== EPG ===== -->
     <string name="epg_title">Program</string>
@@ -78,6 +107,17 @@
     <string name="tvh_no_input">Není vstup</string>
 
     <string name="status_epg_loading">Načítám televizní program\u2026</string>
+    <string name="status_disconnected_reconnecting">Odpojeno. Znovu se připojuji\u2026</string>
+    <string name="status_reconnect_delay">Nové připojení za 5 sekund\u2026</string>
+    <string name="status_connecting">Připojuji se k %1$s:%2$d</string>
+    <string name="status_connected">Připojeno</string>
+    <string name="status_syncing">Synchronizuji\u2026</string>
+    <string name="status_connection_failed">Připojení selhalo: %1$s</string>
+    <string name="status_connection_failed_authentication">Připojení selhalo: ověření bylo odmítnuto</string>
+    <string name="status_connection_failed_dns">Připojení selhalo: název serveru nebyl nalezen</string>
+    <string name="status_connection_failed_unreachable">Připojení selhalo: server není dostupný</string>
+    <string name="status_connection_failed_timeout">Připojení selhalo: server neodpověděl včas</string>
+    <string name="status_connection_failed_other">Připojení selhalo</string>
 
     <string name="status_epg_warmup">Program: načítám %1$d/%2$d</string>
     <string name="status_epg_steady_warmup">Program: připraven (načteno %1$d/%2$d)</string>

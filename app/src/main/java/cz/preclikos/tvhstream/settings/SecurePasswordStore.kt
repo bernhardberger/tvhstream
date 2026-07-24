@@ -18,27 +18,51 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import timber.log.Timber
 
 private val Context.secureDataStore by preferencesDataStore(name = "tvh_secure")
+
+sealed interface StoredPassword {
+    data object Empty : StoredPassword
+
+    data class Available(val value: String) : StoredPassword {
+        override fun toString(): String = "Available"
+    }
+
+    data object Unavailable : StoredPassword
+}
+
+internal fun decodeStoredPassword(
+    encoded: String?,
+    decrypt: (String) -> String,
+    onFailure: (Exception) -> Unit = {},
+): StoredPassword {
+    if (encoded == null) return StoredPassword.Empty
+
+    return try {
+        StoredPassword.Available(decrypt(encoded))
+    } catch (exception: Exception) {
+        onFailure(exception)
+        StoredPassword.Unavailable
+    }
+}
 
 class SecurePasswordStore(private val context: Context) {
 
     private val passwordKey = stringPreferencesKey("password_enc")
     private val keyAlias = "tvh_secure_aes_key"
     
-    val passwordFlow: Flow<String> =
+    val passwordState: Flow<StoredPassword> =
         context.secureDataStore.data
             .map { prefs ->
-                val enc = prefs[passwordKey] ?: return@map ""
-                runCatching { decrypt(enc) }.getOrDefault("")
+                decodeStoredPassword(
+                    encoded = prefs[passwordKey],
+                    decrypt = ::decrypt,
+                    onFailure = { Timber.e(it, "Stored password is unreadable") },
+                )
             }
             .distinctUntilChanged()
             .flowOn(Dispatchers.Default)
-
-    suspend fun getPassword(): String {
-        val enc = context.secureDataStore.data.first()[passwordKey] ?: return ""
-        return runCatching { decrypt(enc) }.getOrDefault("")
-    }
 
     suspend fun setPassword(value: String) {
         if (value.isEmpty()) {
@@ -94,10 +118,10 @@ class SecurePasswordStore(private val context: Context) {
 
     private fun decrypt(encoded: String): String {
         val blob = Base64.decode(encoded, Base64.NO_WRAP)
-        if (blob.size < 12) return ""
+        require(blob.size > GCM_IV_SIZE_BYTES) { "Encrypted password is truncated" }
 
-        val iv = blob.copyOfRange(0, 12)
-        val cipherText = blob.copyOfRange(12, blob.size)
+        val iv = blob.copyOfRange(0, GCM_IV_SIZE_BYTES)
+        val cipherText = blob.copyOfRange(GCM_IV_SIZE_BYTES, blob.size)
 
         val key = getOrCreateSecretKey()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -105,5 +129,9 @@ class SecurePasswordStore(private val context: Context) {
 
         val plain = cipher.doFinal(cipherText)
         return plain.toString(Charsets.UTF_8)
+    }
+
+    private companion object {
+        const val GCM_IV_SIZE_BYTES = 12
     }
 }

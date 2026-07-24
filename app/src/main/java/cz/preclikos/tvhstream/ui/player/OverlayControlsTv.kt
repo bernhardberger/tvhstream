@@ -17,10 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,20 +36,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.settings.AspectRatioMode
 import cz.preclikos.tvhstream.ui.common.formatClock
-import cz.preclikos.tvhstream.ui.common.formatHms
 import cz.preclikos.tvhstream.ui.common.progress
-import cz.preclikos.tvhstream.ui.components.RoundIconButton
 import cz.preclikos.tvhstream.ui.components.PiconBox
+import cz.preclikos.tvhstream.ui.components.RoundIconButton
 
 @Composable
 fun OverlayControlsTv(
@@ -71,301 +70,148 @@ fun OverlayControlsTv(
 ) {
     var showAudio by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
-
     var lastFocused by rememberSaveable { mutableIntStateOf(0) }
 
-    val stopFR = remember { FocusRequester() }
-    val audioFR = remember { FocusRequester() }
-    val subsFR = remember { FocusRequester() }
-    val aspectFR = remember { FocusRequester() }
-    val focusRequesters = remember { listOf(stopFR, audioFR, subsFR, aspectFR) }
+    val stopFocus = remember { FocusRequester() }
+    val aspectFocus = remember { FocusRequester() }
+    val audioFocus = remember { FocusRequester() }
+    val subtitleFocus = remember { FocusRequester() }
+    val focusRequesters = remember {
+        listOf(stopFocus, aspectFocus, audioFocus, subtitleFocus)
+    }
 
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible) {
-            focusRequesters.getOrNull(lastFocused)?.requestFocus()
-        }
+        if (controlsVisible) focusRequesters.getOrNull(lastFocused)?.requestFocus()
     }
 
-    val clock = remember(nowSec) { formatClock(nowSec) }
-    val endsAt = remember(nowEvent) { nowEvent?.let { formatClock(it.stop) } ?: "" }
     val progress = remember(nowEvent, nowSec) { nowEvent?.progress(nowSec) ?: 0f }
-
-    val centerTimeText = remember(nowEvent, nowSec) {
-        nowEvent?.let { event ->
-            val elapsed = (nowSec - event.start).coerceAtLeast(0L)
-            val total = (event.stop - event.start).coerceAtLeast(1L)
-            "${formatHms(elapsed)} / ${formatHms(total)}"
-        } ?: "—"
-    }
-
     val title = remember(nowEvent) { nowEvent?.title.orEmpty() }
     val summary = remember(nowEvent) { nowEvent?.summary?.trim().orEmpty() }
+    val timeRange = remember(nowEvent) { nowEvent?.timeRangeText().orEmpty() }
+    val clock = remember(nowSec) { formatClock(nowSec) }
 
     Box(Modifier.fillMaxSize()) {
-
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .background(topGradient)
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .align(Alignment.BottomCenter)
+                .background(bottomGradient)
+                .padding(start = 56.dp, end = 56.dp, top = 120.dp, bottom = 32.dp),
         ) {
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 PiconBox(
                     imageLoader = imageLoader,
                     piconPath = piconPath,
                     modifier = Modifier
-                        .width(96.dp)
-                        .height(68.dp)
+                        .width(80.dp)
+                        .height(56.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .background(Color.White.copy(alpha = 0.10f))
                         .padding(6.dp),
                 )
-
-                Spacer(Modifier.width(14.dp))
-
+                Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (channelNumber != null) {
-                            Text(
-                                text = channelNumber.toString(),
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        Text(
-                            text = channelName,
-                            color = Color.White.copy(alpha = 0.90f),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (title.isNotEmpty()) {
-                        Text(
-                            text = title,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (summary.isNotEmpty()) {
-                        Text(
-                            text = summary,
-                            color = Color.White.copy(alpha = 0.86f),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = listOfNotNull(channelNumber?.toString(), channelName)
+                            .joinToString("  "),
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = title.ifEmpty { channelName },
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
+                Text(
+                    text = clock,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
 
-                Spacer(Modifier.width(18.dp))
+            if (summary.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = summary,
+                    color = Color.White.copy(alpha = 0.82f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(0.72f),
+                )
+            }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(clock, color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    if (endsAt.isNotEmpty()) {
-                        Text(
-                            text = stringResource(
-                                id = R.string.player_ends_in, endsAt
-                            ),
-                            color = Color.White.copy(alpha = 0.90f),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    text = timeRange,
+                    color = Color.White.copy(alpha = 0.82f),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(Modifier.weight(1f))
+                if (nextEvent != null) {
+                    Text(
+                        text = stringResource(R.string.player_next_event, nextEvent.title),
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-        }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                color = Color.White,
+                trackColor = Color.White.copy(alpha = 0.24f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp),
+            )
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(bottomGradient)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Spacer(Modifier.height(18.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Progress + čas
-                Text(
-                    text = centerTimeText,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1
+                RoundIconButton(
+                    icon = {
+                        Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
+                    },
+                    onClick = { onUserInteraction(); onBack() },
+                    focusRequester = stopFocus,
+                    onFocused = { lastFocused = 0 },
                 )
-
-                Spacer(Modifier.height(8.dp))
-
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    color = Color.White,
-                    trackColor = Color.White.copy(alpha = 0.22f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
+                RoundIconButton(
+                    icon = { AspectRatioIcon(aspectRatio) },
+                    onClick = { onUserInteraction(); onAspectRatioChange() },
+                    focusRequester = aspectFocus,
+                    onFocused = { lastFocused = 1 },
                 )
-
-                Spacer(Modifier.height(8.dp))
-
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (nextEvent != null) {
-                        val nextRange = remember(nextEvent) { nextEvent.timeRangeText() ?: "" }
-                        val text = if (nextRange.isNotEmpty()) {
-                            stringResource(
-                                R.string.player_next_event_with_range,
-                                nextEvent.title,
-                                nextRange
-                            )
-                        } else {
-                            stringResource(R.string.player_next_event, nextEvent.title)
-                        }
-                        Text(
-                            text = text,
-                            color = Color.White.copy(alpha = 0.80f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 120.dp)
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-
-
-                        RoundIconButton(
-                            icon = { Icon(Icons.Filled.Stop, contentDescription = "Stop") },
-                            onClick = { onUserInteraction(); onBack() },
-                            focusRequester = stopFR,
-                            onFocused = { lastFocused = 0 }
-                        )
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            RoundIconButton(
-                                icon = {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Canvas(modifier = Modifier.size(28.dp)) {
-                                            val strokeWidth = 2.5f
-                                            val cap = StrokeCap.Round
-                                            val color = Color.White
-                                            val s = size.width * 0.28f
-
-                                            drawLine(
-                                                color,
-                                                Offset(0f, s),
-                                                Offset(0f, 0f),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(0f, 0f),
-                                                Offset(s, 0f),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(size.width - s, 0f),
-                                                Offset(size.width, 0f),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(size.width, 0f),
-                                                Offset(size.width, s),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(0f, size.height - s),
-                                                Offset(0f, size.height),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(0f, size.height),
-                                                Offset(s, size.height),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(size.width - s, size.height),
-                                                Offset(size.width, size.height),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                            drawLine(
-                                                color,
-                                                Offset(size.width, size.height - s),
-                                                Offset(size.width, size.height),
-                                                strokeWidth,
-                                                cap
-                                            )
-                                        }
-                                        Text(
-                                            text = when (aspectRatio) {
-                                                AspectRatioMode.FIT -> "AUTO"
-                                                AspectRatioMode.FORCE_16_9 -> "16:9"
-                                                AspectRatioMode.FORCE_4_3 -> "4:3"
-                                            },
-                                            color = Color.White,
-                                            fontSize = 7.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                },
-                                onClick = { onUserInteraction(); onAspectRatioChange() },
-                                focusRequester = aspectFR,
-                                onFocused = { lastFocused = 3 }
-                            )
-                            RoundIconButton(
-                                icon = {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.VolumeUp,
-                                        contentDescription = "Audio"
-                                    )
-                                },
-                                onClick = { onUserInteraction(); showAudio = true },
-                                focusRequester = audioFR,
-                                onFocused = { lastFocused = 1 }
-                            )
-                            RoundIconButton(
-                                icon = {
-                                    Icon(
-                                        Icons.Filled.Subtitles,
-                                        contentDescription = "Subtitles"
-                                    )
-                                },
-                                onClick = { onUserInteraction(); showSubs = true },
-                                focusRequester = subsFR,
-                                onFocused = { lastFocused = 2 }
-                            )
-                        }
-                    }
-                }
-
+                RoundIconButton(
+                    icon = {
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, stringResource(R.string.audio_track))
+                    },
+                    onClick = { onUserInteraction(); showAudio = true },
+                    focusRequester = audioFocus,
+                    onFocused = { lastFocused = 2 },
+                )
+                RoundIconButton(
+                    icon = {
+                        Icon(Icons.Filled.Subtitles, stringResource(R.string.subtitles))
+                    },
+                    onClick = { onUserInteraction(); showSubs = true },
+                    focusRequester = subtitleFocus,
+                    onFocused = { lastFocused = 3 },
+                )
             }
         }
     }
@@ -374,9 +220,35 @@ fun OverlayControlsTv(
     if (showSubs) SubtitleTrackDialog(player = player, onDismiss = { showSubs = false })
 }
 
-
-private fun EpgEventEntry.timeRangeText(): String? {
-    val s = formatClock(start)
-    val e = formatClock(stop)
-    return "$s–$e"
+@Composable
+private fun AspectRatioIcon(aspectRatio: AspectRatioMode) {
+    val color = LocalContentColor.current
+    Box(contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(28.dp)) {
+            val strokeWidth = 2.5f
+            val cap = StrokeCap.Round
+            val inset = size.width * 0.28f
+            drawLine(color, Offset(0f, inset), Offset(0f, 0f), strokeWidth, cap)
+            drawLine(color, Offset(0f, 0f), Offset(inset, 0f), strokeWidth, cap)
+            drawLine(color, Offset(size.width - inset, 0f), Offset(size.width, 0f), strokeWidth, cap)
+            drawLine(color, Offset(size.width, 0f), Offset(size.width, inset), strokeWidth, cap)
+            drawLine(color, Offset(0f, size.height - inset), Offset(0f, size.height), strokeWidth, cap)
+            drawLine(color, Offset(0f, size.height), Offset(inset, size.height), strokeWidth, cap)
+            drawLine(color, Offset(size.width - inset, size.height), Offset(size.width, size.height), strokeWidth, cap)
+            drawLine(color, Offset(size.width, size.height - inset), Offset(size.width, size.height), strokeWidth, cap)
+        }
+        Text(
+            text = when (aspectRatio) {
+                AspectRatioMode.FIT -> "AUTO"
+                AspectRatioMode.FORCE_16_9 -> "16:9"
+                AspectRatioMode.FORCE_4_3 -> "4:3"
+            },
+            color = color,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
 }
+
+private fun EpgEventEntry.timeRangeText(): String =
+    "${formatClock(start)}-${formatClock(stop)}"

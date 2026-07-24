@@ -5,25 +5,19 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.tv.material3.Button
+import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.accessibility.ApplianceEntryAccessibilityService
+import cz.preclikos.tvhstream.ui.components.SettingsPane
 
 @Composable
 fun SettingsAppliance() {
@@ -35,30 +29,15 @@ fun SettingsAppliance() {
         onPauseOrDispose { }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.settings_appliance),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(top = 10.dp),
-        )
+    SettingsPane(title = stringResource(R.string.settings_appliance)) {
         Text(
             text = stringResource(R.string.appliance_accessibility_disclosure),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = stringResource(
                 if (enabled) R.string.appliance_service_enabled
                 else R.string.appliance_service_disabled
             ),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
         )
         Button(
             onClick = {

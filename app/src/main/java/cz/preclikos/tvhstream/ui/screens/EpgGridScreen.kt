@@ -23,12 +23,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.SurfaceDefaults
+import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,15 +52,21 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.repositories.TvhRepository
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.ui.common.floorToMinutes
 import cz.preclikos.tvhstream.ui.common.formatHm
+import cz.preclikos.tvhstream.ui.TvScreenPadding
+import cz.preclikos.tvhstream.ui.TvEpgPanelAlpha
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -78,8 +84,10 @@ fun EpgGridScreen(
     repo: TvhRepository = koinInject(),
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
-    val selectedId by selection.selectedId.collectAsState()
-    val channels by channelViewModel.channels.collectAsState()
+    val selectedId by selection.selectedId.collectAsStateWithLifecycle()
+    val channels by channelViewModel.channels.collectAsStateWithLifecycle()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
     
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
@@ -128,6 +136,12 @@ fun EpgGridScreen(
     
     var didInitialFocus by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
+    var activationReady by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(300L)
+        activationReady = true
+    }
 
 
     LaunchedEffect(channels, selectedId) {
@@ -166,20 +180,23 @@ fun EpgGridScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(14.dp)
+            .padding(TvScreenPadding)
     ) {
         Text(
-            text = "EPG",
-            style = MaterialTheme.typography.titleLarge,
+            text = stringResource(R.string.epg_title),
+            style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(20.dp))
 
         
         Surface(
             tonalElevation = 2.dp,
             shape = MaterialTheme.shapes.medium,
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvEpgPanelAlpha),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
             TimeHeaderRow(
@@ -199,6 +216,10 @@ fun EpgGridScreen(
         Surface(
             tonalElevation = 2.dp,
             shape = MaterialTheme.shapes.medium,
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvEpgPanelAlpha),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
             modifier = Modifier.fillMaxSize()
         ) {
             LazyColumn(
@@ -213,11 +234,16 @@ fun EpgGridScreen(
                     val isSelected = ch.id == selectedId
 
                     val epgFlow = remember(ch.id) { repo.epgForChannel(ch.id) }
-                    val epg by epgFlow.collectAsState()
+                    val epg by epgFlow.collectAsStateWithLifecycle()
 
                     EpgGridRow(
                         modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
                         channel = ch,
+                        channelNumber = ChannelNavigation.numberForId(
+                            orderedChannelIds,
+                            channelNumbers,
+                            ch.id,
+                        ),
                         selected = isSelected,
                         epg = epg,
                         nowSec = nowSec,
@@ -228,6 +254,7 @@ fun EpgGridScreen(
                         rowHeight = rowHeight,
                         hScroll = hScroll,
                         stepPx = stepPx,
+                        activationReady = activationReady,
                         scope = scope,
                         onSelect = {
                             if (!isRestoring) selection.setSelected(ch.id)
@@ -237,7 +264,7 @@ fun EpgGridScreen(
 
                     HorizontalDivider(
                         thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                            color = MaterialTheme.colorScheme.borderVariant.copy(alpha = 0.55f)
                     )
                 }
             }
@@ -295,6 +322,7 @@ private fun TimeHeaderRow(
 private fun EpgGridRow(
     modifier: Modifier = Modifier,
     channel: ChannelUi,
+    channelNumber: Int?,
     selected: Boolean,
     epg: List<EpgEventEntry>,
     nowSec: Long,
@@ -305,6 +333,7 @@ private fun EpgGridRow(
     rowHeight: Dp,
     hScroll: androidx.compose.foundation.ScrollState,
     stepPx: Float,
+    activationReady: Boolean,
     scope: kotlinx.coroutines.CoroutineScope,
     onSelect: () -> Unit,
     onPlay: () -> Unit
@@ -358,7 +387,7 @@ private fun EpgGridRow(
                 val isOk =
                     (ev.key == Key.Enter || ev.key == Key.NumPadEnter || ev.key == Key.DirectionCenter)
                 if (ev.type == KeyEventType.KeyDown && isOk) {
-                    onPlay()
+                    if (activationReady) onPlay()
                     true
                 } else false
             }
@@ -368,6 +397,7 @@ private fun EpgGridRow(
         
         ChannelNameCell(
             channel = channel,
+            channelNumber = channelNumber,
             selected = selected,
             focused = focused,
             width = channelColWidth
@@ -391,6 +421,7 @@ private fun EpgGridRow(
 @Composable
 private fun ChannelNameCell(
     channel: ChannelUi,
+    channelNumber: Int?,
     selected: Boolean,
     focused: Boolean,
     width: Dp
@@ -410,13 +441,24 @@ private fun ChannelNameCell(
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Text(
-            text = channel.name,
-            style = MaterialTheme.typography.titleSmall,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (channelNumber != null) {
+                Text(
+                    text = channelNumber.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(40.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = channel.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -450,7 +492,7 @@ private fun TimelineVisual(
                         .fillMaxHeight()
                         .border(
                             width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f)
+                            color = MaterialTheme.colorScheme.borderVariant.copy(alpha = 0.30f)
                         )
                 )
             }

@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ConnectionPolicy
+import cz.preclikos.tvhstream.core.ConnectionFailureKind
+import cz.preclikos.tvhstream.core.connectionFailureKind
 import cz.preclikos.tvhstream.htsp.HtspEvent
 import cz.preclikos.tvhstream.htsp.HtspMessage
 import cz.preclikos.tvhstream.htsp.HtspService
@@ -15,14 +17,12 @@ import cz.preclikos.tvhstream.services.StatusSlot
 import cz.preclikos.tvhstream.services.UiText
 import cz.preclikos.tvhstream.settings.SecurePasswordStore
 import cz.preclikos.tvhstream.settings.ServerSettingsStore
+import cz.preclikos.tvhstream.settings.StoredPassword
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -35,6 +35,7 @@ class AppConnectionViewModel(
 ) : ViewModel() {
 
     val status = statusService.headline
+    val connectionState = htsp.state
 
     private data class ServerCfg(
         val host: String,
@@ -56,22 +57,35 @@ class AppConnectionViewModel(
         autoJob = viewModelScope.launch(Dispatchers.IO) {
             combine(
                 settings.serverSettings,
-                passwords.passwordFlow
-            ) { s, pwd -> s to pwd }
-                // Auto-connect as soon as host + port are configured. Username/password
-                // are optional: an unauthenticated TVHeadend is connected with empty
-                // credentials (HtspService.connect skips the auth step when either is blank).
-                .filter { (s, _) -> ConnectionPolicy.isAutoConnectReady(s.host, s.htspPort) }
-                .map { (s, pwd) ->
-                    ServerCfg(
-                        host = s.host,
-                        htspPort = s.htspPort,
-                        username = s.username,
-                        password = pwd
+                passwords.passwordState,
+            ) { server, password -> server to password }
+                .collectLatest { (server, password) ->
+                    if (!ConnectionPolicy.isAutoConnectReady(server.host, server.htspPort)) {
+                        return@collectLatest
+                    }
+
+                    val value = when (password) {
+                        StoredPassword.Empty -> ""
+                        is StoredPassword.Available -> password.value
+                        StoredPassword.Unavailable -> {
+                            lastCfg = null
+                            reconnectJob?.cancel()
+                            reconnectJob = null
+                            statusService.set(
+                                StatusSlot.CONNECTION,
+                                UiText.Res(R.string.credential_unavailable),
+                            )
+                            return@collectLatest
+                        }
+                    }
+
+                    val cfg = ServerCfg(
+                        host = server.host,
+                        htspPort = server.htspPort,
+                        username = server.username,
+                        password = value,
                     )
-                }
-                .distinctUntilChanged()
-                .collectLatest { cfg ->
+                    if (lastCfg == cfg) return@collectLatest
                     lastCfg = cfg
                     startOrRestartReconnectLoop()
                 }
@@ -83,7 +97,7 @@ class AppConnectionViewModel(
                     is HtspEvent.ConnectionError -> {
                         statusService.set(
                             StatusSlot.CONNECTION,
-                            UiText.Plain("Disconnected. Reconnecting…")
+                            UiText.Res(R.string.status_disconnected_reconnecting)
                         )
                         repo.onDisconnected()
                         startOrRestartReconnectLoop()
@@ -178,7 +192,6 @@ class AppConnectionViewModel(
                 )
                 if (ok) return@launch
 
-                statusService.set(StatusSlot.CONNECTION, UiText.Plain("Reconnect in 5s…"))
                 delay(5_000)
             }
         }
@@ -205,7 +218,10 @@ class AppConnectionViewModel(
         return try {
             statusService.set(StatusSlot.SYNC, null)
             statusService.set(StatusSlot.EPG, null)
-            statusService.set(StatusSlot.CONNECTION, UiText.Plain("Connecting to $host:$port"))
+            statusService.set(
+                StatusSlot.CONNECTION,
+                UiText.Res(R.string.status_connecting, listOf(host, port)),
+            )
 
             repo.onNewConnectionStarting()
 
@@ -218,9 +234,9 @@ class AppConnectionViewModel(
                 connectTimeoutMs = 10_000,
                 responseTimeoutMs = 5_000
             )
-            statusService.set(StatusSlot.CONNECTION, UiText.Plain("Connected"))
+            statusService.set(StatusSlot.CONNECTION, UiText.Res(R.string.status_connected))
 
-            statusService.set(StatusSlot.SYNC, UiText.Plain("Syncing…"))
+            statusService.set(StatusSlot.SYNC, UiText.Res(R.string.status_syncing))
             htsp.enableAsyncMetadataAndWaitInitialSync()
 
             repo.awaitChannelsReady()
@@ -229,9 +245,16 @@ class AppConnectionViewModel(
             true
         } catch (e: Exception) {
             Timber.e(e, "Connect failed")
+            val statusRes = when (connectionFailureKind(e)) {
+                ConnectionFailureKind.AUTHENTICATION -> R.string.status_connection_failed_authentication
+                ConnectionFailureKind.DNS -> R.string.status_connection_failed_dns
+                ConnectionFailureKind.UNREACHABLE -> R.string.status_connection_failed_unreachable
+                ConnectionFailureKind.TIMEOUT -> R.string.status_connection_failed_timeout
+                ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
+            }
             statusService.set(
                 StatusSlot.CONNECTION,
-                UiText.Plain("Connection failed: ${e.message ?: e}")
+                UiText.Res(statusRes)
             )
             false
         }
