@@ -11,9 +11,13 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -52,8 +56,10 @@ import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.core.ChannelPickAction
 import cz.preclikos.tvhstream.core.MediaPlaybackAction
+import cz.preclikos.tvhstream.core.PlaybackStatusPresentation
 import cz.preclikos.tvhstream.core.channelPickAction
 import cz.preclikos.tvhstream.core.mediaPlaybackAction
+import cz.preclikos.tvhstream.core.playbackStatusPresentation
 import cz.preclikos.tvhstream.core.shouldRevealPlaybackControls
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.ConnectionState
@@ -274,10 +280,23 @@ fun VideoPlayerScreen(
             currentChannelId,
         )
     }
-    val recoveryVisible = screenActive && (
-        connState !is ConnectionState.Connected ||
-            playbackState !is PlaybackSessionState.Playing
-        )
+    val statusPresentation = playbackStatusPresentation(
+        connectionAvailable = connState is ConnectionState.Connected,
+        playbackStarting = playbackState is PlaybackSessionState.Starting,
+        playbackRecovering = playbackState is PlaybackSessionState.Recovering,
+        playbackPlaying = playbackState is PlaybackSessionState.Playing,
+    )
+    val recoveryVisible = screenActive &&
+        statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+    var compactTuningVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(screenActive, statusPresentation) {
+        compactTuningVisible = false
+        if (screenActive && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING) {
+            delay(500L)
+            compactTuningVisible = true
+        }
+    }
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) drawerOpen = false
@@ -519,13 +538,44 @@ fun VideoPlayerScreen(
             }
         }
 
+        AnimatedVisibility(
+            visible = compactTuningVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 48.dp),
+        ) {
+            Surface(
+                colors = SurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.78f),
+                    contentColor = Color.White,
+                ),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.player_tuning_channel, currentChannelName),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        }
+
         TvRecoveryOverlay(
             visible = recoveryVisible,
             message = stringResource(
                 when {
                     connState !is ConnectionState.Connected -> R.string.player_connection_recovering
-                    playbackState is PlaybackSessionState.Recovering -> R.string.player_playback_recovering
-                    else -> R.string.player_starting_channel
+                    else -> R.string.player_playback_recovering
                 }
             ),
             opaque = false,

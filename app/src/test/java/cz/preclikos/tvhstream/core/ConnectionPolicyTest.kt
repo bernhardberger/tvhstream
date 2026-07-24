@@ -34,4 +34,23 @@ class ConnectionPolicyTest {
         assertFalse(ConnectionPolicy.shouldAuthenticate("", "pass"))
         assertFalse(ConnectionPolicy.shouldAuthenticate("  ", "  "))
     }
+
+    @Test
+    fun matchingConnectedEndpoint_isReused() {
+        assertTrue(
+            ConnectionPolicy.isSameEndpoint(
+                connectedHost = "tvh.local",
+                connectedPort = 9982,
+                requestedHost = " tvh.local ",
+                requestedPort = 9982,
+            )
+        )
+    }
+
+    @Test
+    fun changedOrMissingConnectedEndpoint_isNotReused() {
+        assertFalse(ConnectionPolicy.isSameEndpoint(null, null, "tvh.local", 9982))
+        assertFalse(ConnectionPolicy.isSameEndpoint("other.local", 9982, "tvh.local", 9982))
+        assertFalse(ConnectionPolicy.isSameEndpoint("tvh.local", 9983, "tvh.local", 9982))
+    }
 }

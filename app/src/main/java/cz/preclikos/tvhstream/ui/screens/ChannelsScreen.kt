@@ -3,6 +3,7 @@ package cz.preclikos.tvhstream.ui.screens
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,11 +13,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
@@ -42,6 +48,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.ChannelNavigation
+import cz.preclikos.tvhstream.core.ConnectionFailureKind
+import cz.preclikos.tvhstream.core.ConnectionUiState
+import cz.preclikos.tvhstream.core.SubscriptionFailureKind
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.ui.common.formatHm
@@ -62,6 +71,9 @@ fun ChannelsScreen(
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
+    connectionUiState: ConnectionUiState,
+    onRetryConnection: () -> Unit,
+    onOpenConnectionSettings: () -> Unit,
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
     val channels by channelViewModel.channels.collectAsStateWithLifecycle()
@@ -137,6 +149,25 @@ fun ChannelsScreen(
         }
 
         Spacer(Modifier.height(20.dp))
+
+        if (channels.isEmpty()) {
+            EmptyChannelsState(
+                state = connectionUiState,
+                onRetry = onRetryConnection,
+                onOpenSettings = onOpenConnectionSettings,
+                modifier = Modifier.fillMaxSize(),
+            )
+            return@Column
+        }
+
+        if (connectionUiState != ConnectionUiState.Ready) {
+            InlineConnectionState(
+                state = connectionUiState,
+                onRetry = onRetryConnection,
+                onOpenSettings = onOpenConnectionSettings,
+            )
+            Spacer(Modifier.height(12.dp))
+        }
 
         Row(Modifier.fillMaxSize()) {
             Surface(
@@ -215,6 +246,205 @@ fun ChannelsScreen(
         }
     }
 }
+
+@Composable
+private fun EmptyChannelsState(
+    state: ConnectionUiState,
+    onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val actionFocus = remember { FocusRequester() }
+    val hasPrimaryAction = state is ConnectionUiState.Error ||
+        state is ConnectionUiState.SubscriptionError ||
+        state == ConnectionUiState.NeedsConfiguration ||
+        state == ConnectionUiState.CredentialUnavailable
+
+    LaunchedEffect(state, hasPrimaryAction) {
+        if (hasPrimaryAction) {
+            withFrameNanos { }
+            actionFocus.requestFocus()
+        }
+    }
+
+    Surface(
+        tonalElevation = 2.dp,
+        shape = MaterialTheme.shapes.medium,
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvBrowsePanelAlpha),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            DelayedConnectionProgress(visible = state.isConnectionProgress())
+            Text(
+                text = connectionMessage(state),
+                style = MaterialTheme.typography.titleLarge,
+                color = if (state.isError()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier
+                    .padding(top = if (state.isConnectionProgress()) 20.dp else 0.dp)
+                    .widthIn(max = 680.dp),
+            )
+
+            when (state) {
+                ConnectionUiState.NeedsConfiguration,
+                ConnectionUiState.CredentialUnavailable -> {
+                    Button(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .padding(top = 24.dp)
+                            .focusRequester(actionFocus),
+                    ) {
+                        Text(stringResource(R.string.open_connection_settings))
+                    }
+                }
+
+                is ConnectionUiState.Error,
+                is ConnectionUiState.SubscriptionError -> {
+                    Row(
+                        modifier = Modifier.padding(top = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Button(
+                            onClick = onRetry,
+                            modifier = Modifier.focusRequester(actionFocus),
+                        ) {
+                            Text(stringResource(R.string.retry))
+                        }
+                        OutlinedButton(onClick = onOpenSettings) {
+                            Text(stringResource(R.string.open_connection_settings))
+                        }
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineConnectionState(
+    state: ConnectionUiState,
+    onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            DelayedConnectionProgress(
+                visible = state.isConnectionProgress(),
+                modifier = Modifier.size(28.dp),
+            )
+            Text(
+                text = connectionMessage(state),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (state.isError()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (state is ConnectionUiState.Error || state is ConnectionUiState.SubscriptionError) {
+                Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                OutlinedButton(onClick = onOpenSettings) {
+                    Text(stringResource(R.string.connection_settings_short))
+                }
+            } else if (
+                state == ConnectionUiState.NeedsConfiguration ||
+                state == ConnectionUiState.CredentialUnavailable
+            ) {
+                Button(onClick = onOpenSettings) {
+                    Text(stringResource(R.string.connection_settings_short))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DelayedConnectionProgress(
+    visible: Boolean,
+    modifier: Modifier = Modifier.size(40.dp),
+) {
+    var show by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        show = false
+        if (visible) {
+            delay(400L)
+            show = true
+        }
+    }
+    if (show) {
+        CircularProgressIndicator(
+            color = MaterialTheme.colorScheme.primary,
+            modifier = modifier,
+        )
+    }
+}
+
+private fun ConnectionUiState.isConnectionProgress(): Boolean =
+    this == ConnectionUiState.Connecting ||
+        this == ConnectionUiState.SyncingChannels ||
+        this == ConnectionUiState.Reconnecting
+
+private fun ConnectionUiState.isError(): Boolean =
+    this is ConnectionUiState.Error ||
+        this is ConnectionUiState.SubscriptionError ||
+        this == ConnectionUiState.CredentialUnavailable
+
+@Composable
+private fun connectionMessage(state: ConnectionUiState): String = stringResource(
+    when (state) {
+        ConnectionUiState.NeedsConfiguration -> R.string.connection_configuration_required
+        ConnectionUiState.Connecting -> R.string.connection_connecting
+        ConnectionUiState.SyncingChannels -> R.string.connection_loading_channels
+        ConnectionUiState.Ready -> R.string.no_channels_available
+        ConnectionUiState.Reconnecting -> R.string.status_disconnected_reconnecting
+        ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
+        is ConnectionUiState.Error -> when (state.kind) {
+            ConnectionFailureKind.AUTHENTICATION -> R.string.status_connection_failed_authentication
+            ConnectionFailureKind.DNS -> R.string.status_connection_failed_dns
+            ConnectionFailureKind.UNREACHABLE -> R.string.status_connection_failed_unreachable
+            ConnectionFailureKind.TIMEOUT -> R.string.status_connection_failed_timeout
+            ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
+        }
+        is ConnectionUiState.SubscriptionError -> when (state.kind) {
+            SubscriptionFailureKind.INVALID_TARGET -> R.string.tvh_target_invalid
+            SubscriptionFailureKind.NO_FREE_ADAPTER -> R.string.tvh_no_free_adapter
+            SubscriptionFailureKind.MUX_NOT_ENABLED -> R.string.tvh_mux_not_enabled
+            SubscriptionFailureKind.TUNING_FAILED -> R.string.tvh_tuning_failed
+            SubscriptionFailureKind.BAD_SIGNAL -> R.string.tvh_bad_signal
+            SubscriptionFailureKind.SCRAMBLED -> R.string.tvh_scrambled
+            SubscriptionFailureKind.OVERRIDDEN -> R.string.tvh_subscription_overridden
+            SubscriptionFailureKind.NO_INPUT -> R.string.tvh_no_input
+        }
+    }
+)
 
 @Composable
 private fun EpgDetailPane(

@@ -1,15 +1,11 @@
 package cz.preclikos.tvhstream.repositories
 
-import cz.preclikos.tvhstream.R
 import cz.preclikos.tvhstream.core.coverageForEvents
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.htsp.HtspEvent
 import cz.preclikos.tvhstream.htsp.HtspMessage
 import cz.preclikos.tvhstream.htsp.HtspService
-import cz.preclikos.tvhstream.services.StatusService
-import cz.preclikos.tvhstream.services.StatusSlot
-import cz.preclikos.tvhstream.services.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -31,16 +27,42 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-data class EpgCoverage(
+internal data class EpgCoverage(
     var coveredFrom: Long = Long.MAX_VALUE,  // earliest event.start we have
     var coveredTo: Long = 0L,                // latest event.stop we have
-    var lastRefreshSec: Long = 0L            // last time we asked server for this channel
-)
+    var queriedTo: Long = 0L,                // horizon confirmed by the latest successful query
+    var lastAttemptSec: Long = 0L             // last time we asked server for this channel
+) {
+    private val knownTo: Long
+        get() = max(coveredTo, queriedTo)
+
+    fun recordAttempt(attemptedAtSec: Long) {
+        lastAttemptSec = attemptedAtSec
+    }
+
+    fun recordSuccessfulFetch(targetTo: Long, attemptedAtSec: Long) {
+        recordAttempt(attemptedAtSec)
+        queriedTo = max(queriedTo, targetTo)
+    }
+
+    fun needsTopUp(wantedTo: Long, nowSec: Long, cooldownSec: Long): Boolean =
+        knownTo < wantedTo && nowSec - lastAttemptSec >= cooldownSec
+
+    fun nextTargetTo(
+        desiredWarmTo: Long,
+        desiredMinTo: Long,
+        desiredMaxTo: Long,
+        chunkSec: Long,
+    ): Long? = when {
+        knownTo < desiredWarmTo -> min(desiredWarmTo, desiredMaxTo)
+        knownTo < desiredMinTo -> min(knownTo + chunkSec, desiredMaxTo)
+        else -> null
+    }
+}
 
 class TvhRepository(
     private val htsp: HtspService,
     ioDispatcher: CoroutineDispatcher,
-    private val statusService: StatusService
 ) {
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
@@ -83,11 +105,6 @@ class TvhRepository(
     private val keepFutureSec = steadyMaxFutureSec
 
     /**
-     * Overlap when extending horizon to avoid boundary gaps.
-     */
-    private val horizonOverlapSec = 10 * 60L
-
-    /**
      * Don't refresh same channel too often (prevents spinning).
      */
     private val perChannelCooldownSec = 10 * 60L
@@ -95,27 +112,6 @@ class TvhRepository(
     // Worker pacing
     private val requestDelayMs = 250L
     private val idleDelayMs = 3_000L
-
-    // ---------------------------
-    // Status helpers
-    // ---------------------------
-
-    private var lastStatusMs = 0L
-    private fun setStatusThrottled(
-        text: UiText,
-        slot: StatusSlot = StatusSlot.EPG,
-        minIntervalMs: Long = 700L
-    ) {
-        val now = System.currentTimeMillis()
-        if (now - lastStatusMs >= minIntervalMs) {
-            lastStatusMs = now
-            statusService.set(slot, text)
-        }
-    }
-
-    private fun setStatus(text: UiText, slot: StatusSlot = StatusSlot.SYNC) {
-        statusService.set(slot, text)
-    }
 
     // ---------------------------
     // Channels
@@ -174,12 +170,12 @@ class TvhRepository(
         onNewConnectionStarting()
     }
 
-    suspend fun onNewConnectionStarting() {
+    suspend fun onNewConnectionStarting(preservePublishedChannels: Boolean = true) {
         stateMutex.withLock {
-            channelStore.reset()
-            _channelsUi.value = emptyList()
+            channelStore.reset(preservePublished = preservePublishedChannels)
+            _channelsUi.value = channelStore.publishedSnapshot().toChannelUi()
 
-            epgByChannel.clear()
+            if (!preservePublishedChannels) epgByChannel.clear()
             epgCoverage.clear()
             epgInFlight.clear()
 
@@ -212,8 +208,6 @@ class TvhRepository(
         if (epgWorkerJob?.isActive == true) return
 
         epgWorkerJob = scope.launch {
-            setStatus(UiText.Res(R.string.status_epg_loading), StatusSlot.EPG)
-
             while (isActive) {
               try {
                 val nowSec = nowSec()
@@ -229,39 +223,16 @@ class TvhRepository(
                     val (warmDone, total) = stateMutex.withLock { warmupProgressLocked(nowSec) }
                     if (total > 0 && warmDone >= total) {
                         warmupCompleted = true
-                        setStatusThrottled(
-                            UiText.Res(R.string.status_epg_steady_warmup, listOf(warmDone, total)),
-                            StatusSlot.EPG,
-                            minIntervalMs = 2_000
-                        )
-                    } else if (total > 0) {
-                        setStatusThrottled(
-                            UiText.Res(R.string.status_epg_warmup, listOf(warmDone, total)),
-                            StatusSlot.EPG,
-                            minIntervalMs = 1_000
-                        )
                     }
                     delay(idleDelayMs)
                     continue
                 }
 
-                var ok = 0
                 for (chId in targets) {
                     if (!isActive) break
-                    val did = fetchEpgTopUpOnce(channelId = chId, nowSec = nowSec)
-                    if (did) ok++
+                    fetchEpgTopUpOnce(channelId = chId, nowSec = nowSec)
                     delay(requestDelayMs)
                 }
-
-                val (warmDone, total) = stateMutex.withLock { warmupProgressLocked(nowSec) }
-                setStatusThrottled(
-                    UiText.Res(
-                        R.string.status_epg_warmup_batch,
-                        listOf(warmDone, total, ok, targets.size)
-                    ),
-                    StatusSlot.EPG,
-                    minIntervalMs = 1_000
-                )
 
                 delay(intervalMs)
               } catch (ce: CancellationException) {
@@ -303,36 +274,29 @@ class TvhRepository(
                 val cov = epgCoverage[channelId] ?: EpgCoverage()
 
                 // Cooldown check (avoid hammering same channel)
-                if (nowSec - cov.lastRefreshSec < perChannelCooldownSec) return false
+                if (!cov.needsTopUp(desiredMinTo, nowSec, perChannelCooldownSec)) return false
 
-                val currentTo = cov.coveredTo
-
-                // Warmup phase for this channel?
-                if (currentTo < desiredWarmTo) {
-                    min(desiredWarmTo, desiredMaxTo)
-                } else {
-                    // Steady phase: if below min future, extend by chunk, capped to max
-                    if (currentTo < desiredMinTo) {
-                        min(currentTo + topUpChunkSec, desiredMaxTo)
-                    } else {
-                        // already good
-                        return false
-                    }
-                }
+                val target = cov.nextTargetTo(
+                    desiredWarmTo = desiredWarmTo,
+                    desiredMinTo = desiredMinTo,
+                    desiredMaxTo = desiredMaxTo,
+                    chunkSec = topUpChunkSec,
+                ) ?: return false
+                cov.recordAttempt(nowSec)
+                target
             }
 
             // If we're here, we want to fetch up to targetTo.
-            // Use epgMaxTime (HTSP v6+). It’s a Unix timestamp (seconds).
+            // HTSP maxTime is a Unix timestamp in seconds.
             val reply = runCatching {
                 htsp.request(
                     method = "getEvents",
                     fields = mapOf(
                         "channelId" to channelId,
-                        "epgMaxTime" to (targetTo),
-                        // optional helpers if your server/client supports them:
-                        // "numFollowing" to 200
+                        "maxTime" to targetTo,
                     ),
-                    timeoutMs = 20_000
+                    timeoutMs = 20_000,
+                    disconnectOnTimeout = false,
                 )
             }.getOrNull() ?: return false
 
@@ -341,8 +305,10 @@ class TvhRepository(
             stateMutex.withLock {
                 // ingest + update coverage from reply
                 ingestGetEventsReplyLocked(reply, nowSec = nowSec)
-                // mark refresh time even if ingest returned 0 (so we don't spin)
-                epgCoverage.getOrPut(channelId) { EpgCoverage() }.lastRefreshSec = nowSec
+                // An empty response still confirms that the server has no events in
+                // this range; do not query the same empty horizon forever.
+                epgCoverage.getOrPut(channelId) { EpgCoverage() }
+                    .recordSuccessfulFetch(targetTo, nowSec)
 
                 // Aggressive trimming pass (keeps cache in bounds)
                 trimAllEpgLocked(nowSec)
@@ -363,7 +329,6 @@ class TvhRepository(
     private fun pickChannelsNeedingTopUpLocked(nowSec: Long, limit: Int): List<Int> {
         if (channelStore.isEmpty()) return emptyList()
 
-        val wantWarmTo = nowSec + warmupFutureSec
         val wantMinTo = nowSec + steadyMinFutureSec
 
         // Order channels by number/name, but select targets by "how far behind horizon they are"
@@ -374,8 +339,7 @@ class TvhRepository(
             .filter { id ->
                 if (epgInFlight.contains(id)) return@filter false
                 val cov = epgCoverage.getOrPut(id) { EpgCoverage() }
-                // Needs warmup or steady top-up
-                (cov.coveredTo < wantWarmTo) || (cov.coveredTo < wantMinTo)
+                cov.needsTopUp(wantMinTo, nowSec, perChannelCooldownSec)
             }
             .sortedBy { id -> epgCoverage[id]?.coveredTo ?: 0L }
             .take(limit)
@@ -390,7 +354,7 @@ class TvhRepository(
         val wantWarmTo = nowSec + warmupFutureSec
         val done = channelStore.ids().count { id ->
             val cov = epgCoverage[id]
-            cov != null && cov.coveredTo >= wantWarmTo
+            cov != null && !cov.needsTopUp(wantWarmTo, nowSec, 0L)
         }
         return done to total
     }
@@ -405,15 +369,14 @@ class TvhRepository(
             "channelDelete" -> stateMutex.withLock { handleChannelDeleteLocked(msg) }
 
             "initialSyncCompleted" -> {
-                val count = stateMutex.withLock {
-                    publishChannelsLocked(channelStore.completeInitialSync())
+                stateMutex.withLock {
+                    val channels = channelStore.completeInitialSync()
+                    val channelIds = channels.mapTo(mutableSetOf()) { it.id }
+                    epgByChannel.keys.removeAll { it !in channelIds }
+                    epgCoverage.keys.removeAll { it !in channelIds }
+                    publishChannelsLocked(channels)
                     if (!channelsReadyDef.isCompleted) channelsReadyDef.complete(Unit)
-                    channelStore.size
                 }
-                setStatus(
-                    UiText.Res(R.string.status_channels_ready, listOf(count)),
-                    StatusSlot.SYNC
-                )
             }
 
             // Async EPG updates (only when server data changes)
@@ -440,11 +403,6 @@ class TvhRepository(
         epgCoverage.getOrPut(id) { EpgCoverage() }
 
         snapshot?.let(::publishChannelsLocked)
-        setStatusThrottled(
-            UiText.Res(R.string.status_syncing_channels, listOf(channelStore.size)),
-            StatusSlot.SYNC,
-            minIntervalMs = 700
-        )
 
         if (isNew && warmupCompleted) {
             scope.launch { fetchEpgTopUpOnce(channelId = id, nowSec = nowSec()) }
@@ -463,8 +421,11 @@ class TvhRepository(
     }
 
     private fun publishChannelsLocked(channels: List<ChannelMetadata>) {
-        _channelsUi.value = channels.map { ChannelUi(it.id, it.name, it.number, it.icon) }
+        _channelsUi.value = channels.toChannelUi()
     }
+
+    private fun List<ChannelMetadata>.toChannelUi(): List<ChannelUi> =
+        map { ChannelUi(it.id, it.name, it.number, it.icon) }
 
     // ---------------------------
     // Query helpers

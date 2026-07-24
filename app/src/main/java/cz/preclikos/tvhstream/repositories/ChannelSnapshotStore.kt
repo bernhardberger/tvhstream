@@ -10,13 +10,15 @@ internal data class ChannelMetadata(
 internal class ChannelSnapshotStore {
     private val channels = linkedMapOf<Int, ChannelMetadata>()
     private var initialSyncCompleted = false
+    private var publishedChannels: List<ChannelMetadata> = emptyList()
 
     val size: Int
         get() = channels.size
 
-    fun reset() {
+    fun reset(preservePublished: Boolean = true) {
         channels.clear()
         initialSyncCompleted = false
+        if (!preservePublished) publishedChannels = emptyList()
     }
 
     operator fun get(id: Int): ChannelMetadata? = channels[id]
@@ -33,7 +35,7 @@ internal class ChannelSnapshotStore {
 
     fun completeInitialSync(): List<ChannelMetadata> {
         initialSyncCompleted = true
-        return snapshot()
+        return snapshot().also { publishedChannels = it }
     }
 
     fun isEmpty(): Boolean = channels.isEmpty()
@@ -42,8 +44,13 @@ internal class ChannelSnapshotStore {
 
     fun snapshot(): List<ChannelMetadata> = channels.values.sortedWith(channelComparator)
 
-    private fun snapshotIfReady(): List<ChannelMetadata>? =
-        if (initialSyncCompleted) snapshot() else null
+    fun publishedSnapshot(): List<ChannelMetadata> = publishedChannels
+
+    private fun snapshotIfReady(): List<ChannelMetadata>? = if (initialSyncCompleted) {
+        snapshot().also { publishedChannels = it }
+    } else {
+        null
+    }
 
     private companion object {
         val channelComparator = compareBy<ChannelMetadata>(

@@ -59,7 +59,7 @@
     <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
-    <string name="player_starting_channel">Starting channel…</string>
+    <string name="player_tuning_channel">Tuning %1$s…</string>
     <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
     <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
 
@@ -108,24 +108,17 @@
     <string name="tvh_subscription_overridden">Subscription overridden</string>
     <string name="tvh_no_input">No input</string>
 
-    <string name="status_epg_loading">Loading guide\u2026</string>
     <string name="status_disconnected_reconnecting">Disconnected. Reconnecting\u2026</string>
-    <string name="status_reconnect_delay">Reconnect in 5 seconds\u2026</string>
-    <string name="status_connecting">Connecting to %1$s:%2$d</string>
-    <string name="status_connected">Connected</string>
-    <string name="status_syncing">Syncing\u2026</string>
-    <string name="status_connection_failed">Connection failed: %1$s</string>
+    <string name="connection_configuration_required">Set up the TVHeadend connection to load channels.</string>
+    <string name="connection_connecting">Connecting to TVHeadend\u2026</string>
+    <string name="connection_loading_channels">Loading channels\u2026</string>
+    <string name="no_channels_available">No channels are available.</string>
+    <string name="retry">Retry</string>
+    <string name="open_connection_settings">Open connection settings</string>
+    <string name="connection_settings_short">Connection settings</string>
     <string name="status_connection_failed_authentication">Connection failed: authentication rejected</string>
     <string name="status_connection_failed_dns">Connection failed: server name not found</string>
     <string name="status_connection_failed_unreachable">Connection failed: server unreachable</string>
     <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
     <string name="status_connection_failed_other">Connection failed</string>
-
-    <string name="status_epg_warmup">Guide: loading %1$d/%2$d</string>
-    <string name="status_epg_steady_warmup">Guide: ready (loaded %1$d/%2$d)</string>
-
-    <string name="status_epg_warmup_batch">Guide: loading %1$d/%2$d (updated %3$d/%4$d)</string>
-
-    <string name="status_channels_ready">Channels ready: %1$d</string>
-    <string name="status_syncing_channels">Syncing channels\u2026 %1$d</string>
 </resources>

@@ -55,7 +55,7 @@
     <string name="appliance_connection_recovering">Fernsehen ist gerade nicht verfügbar. Die Verbindung wird automatisch wiederhergestellt…</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 
-    <string name="player_starting_channel">Sender wird gestartet…</string>
+    <string name="player_tuning_channel">%1$s wird eingestellt…</string>
     <string name="player_connection_recovering">Verbindung unterbrochen. Sie wird automatisch wiederhergestellt…</string>
     <string name="player_playback_recovering">Wiedergabe unterbrochen. Erneuter Versuch läuft automatisch…</string>
 
@@ -93,21 +93,17 @@
     <string name="tvh_subscription_overridden">Stream-Anforderung wurde überschrieben</string>
     <string name="tvh_no_input">Kein Eingangssignal</string>
 
-    <string name="status_epg_loading">Programm wird geladen\u2026</string>
     <string name="status_disconnected_reconnecting">Verbindung getrennt. Neuer Verbindungsversuch\u2026</string>
-    <string name="status_reconnect_delay">Neuer Verbindungsversuch in 5 Sekunden\u2026</string>
-    <string name="status_connecting">Verbindung zu %1$s:%2$d wird hergestellt</string>
-    <string name="status_connected">Verbunden</string>
-    <string name="status_syncing">Synchronisierung läuft\u2026</string>
-    <string name="status_connection_failed">Verbindung fehlgeschlagen: %1$s</string>
+    <string name="connection_configuration_required">Richte die TVHeadend-Verbindung ein, um Sender zu laden.</string>
+    <string name="connection_connecting">Verbindung mit TVHeadend wird hergestellt\u2026</string>
+    <string name="connection_loading_channels">Sender werden geladen\u2026</string>
+    <string name="no_channels_available">Es sind keine Sender verfügbar.</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="open_connection_settings">Verbindungseinstellungen öffnen</string>
+    <string name="connection_settings_short">Verbindungseinstellungen</string>
     <string name="status_connection_failed_authentication">Verbindung fehlgeschlagen: Anmeldung abgelehnt</string>
     <string name="status_connection_failed_dns">Verbindung fehlgeschlagen: Servername nicht gefunden</string>
     <string name="status_connection_failed_unreachable">Verbindung fehlgeschlagen: Server nicht erreichbar</string>
     <string name="status_connection_failed_timeout">Verbindung fehlgeschlagen: Zeitüberschreitung beim Server</string>
     <string name="status_connection_failed_other">Verbindung fehlgeschlagen</string>
-    <string name="status_epg_warmup">Programmdaten: %1$d/%2$d geladen</string>
-    <string name="status_epg_steady_warmup">Programm: bereit (%1$d/%2$d geladen)</string>
-    <string name="status_epg_warmup_batch">Programmdaten: %1$d/%2$d geladen (%3$d/%4$d aktualisiert)</string>
-    <string name="status_channels_ready">Sender verfügbar: %1$d</string>
-    <string name="status_syncing_channels">Sender werden synchronisiert\u2026 %1$d</string>
 </resources>

@@ -1,20 +1,18 @@
 package cz.preclikos.tvhstream.viewmodels
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ConnectionUiState
 import cz.preclikos.tvhstream.core.ConnectionPolicy
-import cz.preclikos.tvhstream.core.ConnectionFailureKind
+import cz.preclikos.tvhstream.core.SubscriptionFailureKind
+import cz.preclikos.tvhstream.core.connectionAttemptState
 import cz.preclikos.tvhstream.core.connectionFailureKind
 import cz.preclikos.tvhstream.htsp.HtspEvent
 import cz.preclikos.tvhstream.htsp.HtspMessage
 import cz.preclikos.tvhstream.htsp.HtspService
+import cz.preclikos.tvhstream.htsp.ConnectionState
 import cz.preclikos.tvhstream.htsp.SubscriptionStatus
 import cz.preclikos.tvhstream.repositories.TvhRepository
-import cz.preclikos.tvhstream.services.StatusService
-import cz.preclikos.tvhstream.services.StatusSlot
-import cz.preclikos.tvhstream.services.UiText
 import cz.preclikos.tvhstream.settings.SecurePasswordStore
 import cz.preclikos.tvhstream.settings.ServerSettingsStore
 import cz.preclikos.tvhstream.settings.StoredPassword
@@ -23,19 +21,21 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 class AppConnectionViewModel(
     private val htsp: HtspService,
     private val repo: TvhRepository,
-    private val statusService: StatusService,
     private val settings: ServerSettingsStore,
     private val passwords: SecurePasswordStore,
 ) : ViewModel() {
 
-    val status = statusService.headline
     val connectionState = htsp.state
+    private val _uiState = MutableStateFlow<ConnectionUiState>(ConnectionUiState.Connecting)
+    val uiState = _uiState.asStateFlow()
 
     private data class ServerCfg(
         val host: String,
@@ -61,6 +61,7 @@ class AppConnectionViewModel(
             ) { server, password -> server to password }
                 .collectLatest { (server, password) ->
                     if (!ConnectionPolicy.isAutoConnectReady(server.host, server.htspPort)) {
+                        _uiState.value = ConnectionUiState.NeedsConfiguration
                         return@collectLatest
                     }
 
@@ -71,10 +72,7 @@ class AppConnectionViewModel(
                             lastCfg = null
                             reconnectJob?.cancel()
                             reconnectJob = null
-                            statusService.set(
-                                StatusSlot.CONNECTION,
-                                UiText.Res(R.string.credential_unavailable),
-                            )
+                            _uiState.value = ConnectionUiState.CredentialUnavailable
                             return@collectLatest
                         }
                     }
@@ -85,9 +83,13 @@ class AppConnectionViewModel(
                         username = server.username,
                         password = value,
                     )
-                    if (lastCfg == cfg) return@collectLatest
+                    val previousCfg = lastCfg
+                    if (previousCfg == cfg) return@collectLatest
                     lastCfg = cfg
-                    startOrRestartReconnectLoop()
+                    startOrRestartReconnectLoop(
+                        reuseMatchingConnection = previousCfg == null,
+                        preservePublishedChannels = previousCfg == null,
+                    )
                 }
         }
 
@@ -95,12 +97,12 @@ class AppConnectionViewModel(
             htsp.controlEvents.collectLatest { e ->
                 when (e) {
                     is HtspEvent.ConnectionError -> {
-                        statusService.set(
-                            StatusSlot.CONNECTION,
-                            UiText.Res(R.string.status_disconnected_reconnecting)
-                        )
+                        _uiState.value = ConnectionUiState.Reconnecting
                         repo.onDisconnected()
-                        startOrRestartReconnectLoop()
+                        startOrRestartReconnectLoop(
+                            reuseMatchingConnection = false,
+                            preservePublishedChannels = true,
+                        )
                     }
 
                     is HtspEvent.ServerMessage -> {
@@ -124,11 +126,13 @@ class AppConnectionViewModel(
     }
 
     private fun publishSubsStatus() {
-        val resId = subs.values.computeUiStatusResId()
-        if (resId == null) {
-            statusService.set(StatusSlot.CONNECTION, null)
+        val failure = subs.values.computeFailureKind()
+        if (failure == null) {
+            if (_uiState.value is ConnectionUiState.SubscriptionError) {
+                _uiState.value = ConnectionUiState.Ready
+            }
         } else {
-            statusService.set(StatusSlot.CONNECTION, UiText.Res(resId))
+            _uiState.value = ConnectionUiState.SubscriptionError(failure)
         }
     }
 
@@ -151,8 +155,7 @@ class AppConnectionViewModel(
         return int("subscriptionId") ?: int("id")
     }
 
-    @StringRes
-    private fun Collection<SubscriptionStatus>.computeUiStatusResId(): Int? {
+    private fun Collection<SubscriptionStatus>.computeFailureKind(): SubscriptionFailureKind? {
         if (isEmpty()) return null
 
         fun norm(v: String?): String =
@@ -162,14 +165,14 @@ class AppConnectionViewModel(
             val code = norm(s.subscriptionError ?: s.state)
 
             return when {
-                "invalidtarget" in code -> R.string.tvh_target_invalid
-                "nofreeadapter" in code -> R.string.tvh_no_free_adapter
-                "muxnotenabled" in code -> R.string.tvh_mux_not_enabled
-                "tuningfailed" in code -> R.string.tvh_tuning_failed
-                "badsignal" in code -> R.string.tvh_bad_signal
-                "scrambled" in code -> R.string.tvh_scrambled
-                "subscriptionoverridden" in code -> R.string.tvh_subscription_overridden
-                "noinput" in code -> R.string.tvh_no_input
+                "invalidtarget" in code -> SubscriptionFailureKind.INVALID_TARGET
+                "nofreeadapter" in code -> SubscriptionFailureKind.NO_FREE_ADAPTER
+                "muxnotenabled" in code -> SubscriptionFailureKind.MUX_NOT_ENABLED
+                "tuningfailed" in code -> SubscriptionFailureKind.TUNING_FAILED
+                "badsignal" in code -> SubscriptionFailureKind.BAD_SIGNAL
+                "scrambled" in code -> SubscriptionFailureKind.SCRAMBLED
+                "subscriptionoverridden" in code -> SubscriptionFailureKind.OVERRIDDEN
+                "noinput" in code -> SubscriptionFailureKind.NO_INPUT
                 else -> continue
             }
         }
@@ -177,10 +180,17 @@ class AppConnectionViewModel(
         return null
     }
 
-    private fun startOrRestartReconnectLoop() {
+    private fun startOrRestartReconnectLoop(
+        reuseMatchingConnection: Boolean,
+        preservePublishedChannels: Boolean,
+    ) {
         reconnectJob?.cancel()
+        _uiState.value = connectionAttemptState(
+            hasPublishedChannels = preservePublishedChannels && repo.channelsUi.value.isNotEmpty(),
+        )
 
         reconnectJob = viewModelScope.launch(Dispatchers.IO) {
+            var mayReuseConnection = reuseMatchingConnection
             while (true) {
                 val cfg = lastCfg ?: return@launch
 
@@ -188,16 +198,22 @@ class AppConnectionViewModel(
                     cfg.host,
                     cfg.htspPort,
                     cfg.username,
-                    cfg.password
+                    cfg.password,
+                    reuseMatchingConnection = mayReuseConnection,
+                    preservePublishedChannels = preservePublishedChannels,
                 )
                 if (ok) return@launch
 
+                mayReuseConnection = false
                 delay(5_000)
             }
         }
     }
 
-    fun reconnectNow() = startOrRestartReconnectLoop()
+    fun reconnectNow() = startOrRestartReconnectLoop(
+        reuseMatchingConnection = false,
+        preservePublishedChannels = true,
+    )
 
     fun connectOnceFromUi(
         host: String,
@@ -206,24 +222,36 @@ class AppConnectionViewModel(
         password: String
     ) {
         lastCfg = ServerCfg(host, htspPort, username, password)
-        startOrRestartReconnectLoop()
+        startOrRestartReconnectLoop(
+            reuseMatchingConnection = false,
+            preservePublishedChannels = false,
+        )
     }
 
     private suspend fun connectInternal(
         host: String,
         port: Int,
         username: String,
-        password: String
+        password: String,
+        reuseMatchingConnection: Boolean,
+        preservePublishedChannels: Boolean,
     ): Boolean {
         return try {
-            statusService.set(StatusSlot.SYNC, null)
-            statusService.set(StatusSlot.EPG, null)
-            statusService.set(
-                StatusSlot.CONNECTION,
-                UiText.Res(R.string.status_connecting, listOf(host, port)),
-            )
+            val connected = htsp.state.value as? ConnectionState.Connected
+            if (reuseMatchingConnection && ConnectionPolicy.isSameEndpoint(
+                    connectedHost = connected?.host,
+                    connectedPort = connected?.port,
+                    requestedHost = host,
+                    requestedPort = port,
+                )
+            ) {
+                _uiState.value = ConnectionUiState.Ready
+                return true
+            }
 
-            repo.onNewConnectionStarting()
+            repo.onNewConnectionStarting(
+                preservePublishedChannels = preservePublishedChannels,
+            )
 
             htsp.connect(
                 host = host,
@@ -234,28 +262,17 @@ class AppConnectionViewModel(
                 connectTimeoutMs = 10_000,
                 responseTimeoutMs = 5_000
             )
-            statusService.set(StatusSlot.CONNECTION, UiText.Res(R.string.status_connected))
-
-            statusService.set(StatusSlot.SYNC, UiText.Res(R.string.status_syncing))
+            _uiState.value = ConnectionUiState.SyncingChannels
             htsp.enableAsyncMetadataAndWaitInitialSync()
 
             repo.awaitChannelsReady()
             repo.startEpgWorker()
+            _uiState.value = ConnectionUiState.Ready
 
             true
         } catch (e: Exception) {
             Timber.e(e, "Connect failed")
-            val statusRes = when (connectionFailureKind(e)) {
-                ConnectionFailureKind.AUTHENTICATION -> R.string.status_connection_failed_authentication
-                ConnectionFailureKind.DNS -> R.string.status_connection_failed_dns
-                ConnectionFailureKind.UNREACHABLE -> R.string.status_connection_failed_unreachable
-                ConnectionFailureKind.TIMEOUT -> R.string.status_connection_failed_timeout
-                ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
-            }
-            statusService.set(
-                StatusSlot.CONNECTION,
-                UiText.Res(statusRes)
-            )
+            _uiState.value = ConnectionUiState.Error(connectionFailureKind(e))
             false
         }
     }

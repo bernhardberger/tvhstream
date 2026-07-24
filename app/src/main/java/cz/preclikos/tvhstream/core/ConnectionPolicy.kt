@@ -23,4 +23,14 @@ object ConnectionPolicy {
         val p = password?.trim().orEmpty()
         return u.isNotEmpty() && p.isNotEmpty()
     }
+
+    fun isSameEndpoint(
+        connectedHost: String?,
+        connectedPort: Int?,
+        requestedHost: String,
+        requestedPort: Int,
+    ): Boolean = connectedHost != null &&
+        connectedPort != null &&
+        connectedHost == requestedHost.trim() &&
+        connectedPort == requestedPort
 }

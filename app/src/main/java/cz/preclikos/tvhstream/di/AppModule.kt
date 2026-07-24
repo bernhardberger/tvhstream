@@ -5,8 +5,6 @@ import cz.preclikos.tvhstream.htsp.HtspService
 import cz.preclikos.tvhstream.htsp.buildImageLoader
 import cz.preclikos.tvhstream.player.PlayerSession
 import cz.preclikos.tvhstream.repositories.TvhRepository
-import cz.preclikos.tvhstream.services.StatusService
-import cz.preclikos.tvhstream.services.StatusServiceImpl
 import cz.preclikos.tvhstream.settings.PlayerSettingsStore
 import cz.preclikos.tvhstream.settings.SecurePasswordStore
 import cz.preclikos.tvhstream.settings.ServerSettingsStore
@@ -31,11 +29,8 @@ val appModule = module {
     single {
         TvhRepository(
             htsp = get(), ioDispatcher = get(named("io")),
-            statusService = get()
         )
     }
-
-    single<StatusService> { StatusServiceImpl() }
 
     single { ServerSettingsStore(context = get()) }
     single { SecurePasswordStore(context = get()) }
@@ -60,7 +55,6 @@ val appModule = module {
             repo = get(),
             settings = get(),
             passwords = get(),
-            statusService = get()
         )
     }
     viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }

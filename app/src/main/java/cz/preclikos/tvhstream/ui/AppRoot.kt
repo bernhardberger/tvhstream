@@ -35,7 +35,6 @@ import cz.preclikos.tvhstream.settings.UiSettings
 import cz.preclikos.tvhstream.settings.UiSettingsStore
 import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.ui.components.ContentContainer
-import cz.preclikos.tvhstream.ui.components.InfoBanner
 import cz.preclikos.tvhstream.ui.components.SideRail
 import cz.preclikos.tvhstream.ui.components.TvRecoveryOverlay
 import cz.preclikos.tvhstream.ui.player.VideoPlayerScreen
@@ -70,7 +69,7 @@ fun AppRoot(
     val focusManager = LocalFocusManager.current
 
     val appVm: AppConnectionViewModel = koinViewModel()
-    val status by appVm.status.collectAsStateWithLifecycle()
+    val connectionUiState by appVm.uiState.collectAsStateWithLifecycle()
     val connectionState by appVm.connectionState.collectAsStateWithLifecycle()
     val channelsVm: ChannelsViewModel = koinViewModel()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
@@ -155,6 +154,11 @@ fun AppRoot(
                     composable(Routes.CHANNELS) {
                         ContentContainer {
                             ChannelsScreen(
+                                connectionUiState = connectionUiState,
+                                onRetryConnection = appVm::reconnectNow,
+                                onOpenConnectionSettings = {
+                                    nav.navigate(Routes.SETTINGS) { launchSingleTop = true }
+                                },
                                 onPlay = { channelId, serviceId, name ->
                                     nav.navigate(Routes.player(channelId, serviceId, name))
                                 }
@@ -198,8 +202,6 @@ fun AppRoot(
                         )
                     }
                 }
-
-                InfoBanner(message = status, modifier = Modifier.fillMaxSize())
 
                 TvRecoveryOverlay(
                     visible = applianceLaunchRequest != null && !isPlayer,

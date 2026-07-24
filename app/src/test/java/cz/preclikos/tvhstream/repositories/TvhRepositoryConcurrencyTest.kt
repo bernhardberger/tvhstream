@@ -1,7 +1,6 @@
 package cz.preclikos.tvhstream.repositories
 
 import cz.preclikos.tvhstream.htsp.HtspService
-import cz.preclikos.tvhstream.services.StatusServiceImpl
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -16,7 +15,6 @@ class TvhRepositoryConcurrencyTest {
         val repository = TvhRepository(
             htsp = HtspService(Dispatchers.IO),
             ioDispatcher = Dispatchers.IO,
-            statusService = StatusServiceImpl(),
         )
         val executor = Executors.newFixedThreadPool(THREADS)
 

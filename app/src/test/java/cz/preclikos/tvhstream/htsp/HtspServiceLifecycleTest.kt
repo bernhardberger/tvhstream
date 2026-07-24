@@ -73,6 +73,34 @@ class HtspServiceLifecycleTest {
         }
     }
 
+    @Test
+    fun optionalRequestTimeoutLeavesSharedConnectionOpen() {
+        FakeHtspServer(respondToHello = true).use { server ->
+            val service = service()
+            runBlocking {
+                service.connect(
+                    host = "127.0.0.1",
+                    port = server.port,
+                    connectTimeoutMs = 1_000,
+                    responseTimeoutMs = 1_000,
+                    soTimeoutMs = 50,
+                )
+
+                val failure = runCatching {
+                    service.request(
+                        method = "getEvents",
+                        timeoutMs = 100,
+                        disconnectOnTimeout = false,
+                    )
+                }.exceptionOrNull()
+
+                assertNotNull(failure)
+                assertTrue(service.state.value is ConnectionState.Connected)
+                service.disconnect()
+            }
+        }
+    }
+
     private fun service() = HtspService(ioDispatcher = Dispatchers.IO)
 
     private class FakeHtspServer(

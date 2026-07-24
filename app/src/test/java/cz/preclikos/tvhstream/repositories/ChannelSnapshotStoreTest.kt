@@ -38,8 +38,21 @@ class ChannelSnapshotStoreTest {
 
         store.reset()
 
+        assertEquals(listOf(10), store.publishedSnapshot().map { it.id })
         assertNull(store.upsert(channel(id = 40, name = "Forty", number = 40)))
         assertEquals(listOf(40), store.completeInitialSync().map { it.id })
+        assertEquals(listOf(40), store.publishedSnapshot().map { it.id })
+    }
+
+    @Test
+    fun resetForChangedServer_discardsThePublishedSnapshot() {
+        val store = ChannelSnapshotStore()
+        store.upsert(channel(id = 10, name = "Ten", number = 10))
+        store.completeInitialSync()
+
+        store.reset(preservePublished = false)
+
+        assertEquals(emptyList<ChannelMetadata>(), store.publishedSnapshot())
     }
 
     private fun channel(id: Int, name: String, number: Int) =
