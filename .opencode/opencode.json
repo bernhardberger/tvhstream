@@ -3,7 +3,7 @@
   "default_agent": "android-appliance",
   "share": "disabled",
   "subagent_depth": 0,
-  "instructions": ["AGENTS.md"],
+  "instructions": ["AGENTS.md", "docs/device-targets.md"],
   "permission": {
     "task": "deny"
   }

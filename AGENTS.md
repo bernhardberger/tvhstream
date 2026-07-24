@@ -10,13 +10,15 @@ clean path for contributing generic improvements back upstream.
 Before non-trivial work:
 
 1. Read `docs/appliance-mode-spec.md`.
-2. Read `docs/appliance-mode-plan.md` and identify the current task.
-3. Read `docs/codebase-audit-2026-07-23.md` for hardening work and
+2. Read `docs/device-targets.md` before any build, install, ADB, or physical-TV
+   work.
+3. Read `docs/appliance-mode-plan.md` and identify the current task.
+4. Read `docs/codebase-audit-2026-07-23.md` for hardening work and
    `docs/product-identity-plan.md` for identity work.
-4. Run `git status -sb` and inspect the recent log.
-5. Fetch both remotes before changing code:
+5. Run `git status -sb` and inspect the recent log.
+6. Fetch both remotes before changing code:
    `git fetch origin && git fetch fork`.
-6. Run `./tools/check-ai-harness` when changing agents, skills, commands, or
+7. Run `./tools/check-ai-harness` when changing agents, skills, commands, or
    OpenCode configuration.
 
 `origin` is the upstream repository. `fork` is Bernhard's public fork. Never
@@ -177,8 +179,11 @@ introduce abstractions for a single use.
   Firebase configuration.
 - Runtime device addresses belong in ignored `.tvhstream-device.json` or the
   `TVHSTREAM_ADB_SERIAL` environment variable.
-- Keep the household target's local device role set to `production`.
-  `tools/device` rejects install, launch, force-stop, smoke, synthetic key, and
+- The dining-room G10 is the current development target and may use local role
+  `test`. The bedroom G08 is handed-over production and must use role
+  `production`. The exact identities and lifecycle rules are in
+  `docs/device-targets.md`.
+- `tools/device` rejects install, launch, force-stop, smoke, synthetic key, and
   credential-provisioning actions unless the local role is `test` and expected
   manufacturer/model match.
 - Do not modify TVHeadend server accounts, tuners, OSCam, recording storage,

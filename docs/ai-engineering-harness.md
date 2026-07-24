@@ -15,6 +15,7 @@ project instructions, agents, skills, and commands.
 | Path | Purpose |
 |---|---|
 | `AGENTS.md` | Project-wide engineering, safety, testing, Git, and upstream rules |
+| `docs/device-targets.md` | Current development-versus-production TV boundary, without private addresses |
 | `.opencode/opencode.json` | Project config; selects the appliance agent, disables sharing and subagent spawning |
 | `.opencode/agents/android-appliance.md` | Default implementation agent |
 | `.opencode/agents/android-reviewer.md` | Directly selectable read-only review agent |
@@ -49,6 +50,10 @@ readability, safe-area, key-dispatch, accessibility, video-scrim, and physical-T
 validation expectations.
 
 ## Local device configuration
+
+OpenCode loads both `AGENTS.md` and `docs/device-targets.md` as project
+instructions. The tracked target document identifies device roles but contains
+no private address; the ignored local file selects the reachable device.
 
 Copy the tracked example to the ignored local file and set the current ADB
 serial. Keep `role` set to `production` for the household TV. Only a separately
