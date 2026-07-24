@@ -39,6 +39,15 @@ Media3/HTSP path as a regression boundary, incomplete native provenance as a
 signed-release blocker, and read-only GitHub CI as the only enabled automation
 until signing and publication are separately approved.
 
+Dedicated TV UX sections in `AGENTS.md`, `android-appliance`, and
+`android-reviewer` make Google TV and Android TV design guidance, Compose for TV,
+and Material for TV guidance a standing implementation and review gate. Google
+TV defines the target product experience; Android TV OS and Compose for TV remain
+the platform and implementation APIs. `tools/check-ai-harness` requires those
+sections so future harness edits cannot silently remove the focus, ten-foot
+readability, safe-area, key-dispatch, accessibility, video-scrim, and physical-TV
+validation expectations.
+
 ## Local device configuration
 
 Copy the tracked example to the ignored local file and set the current ADB

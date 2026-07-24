@@ -53,6 +53,40 @@ for primitives that TV Material 1.1.0 does not provide here, such as text
 fields, progress/dividers, and selected dialog primitives. Do not introduce a
 second competing theme or move focusable controls back to mobile Material.
 
+## TV UX and UI requirements
+
+- Google TV is the target product experience, while Android TV OS remains the
+  platform and API layer. Treat current official Google TV and Android TV design
+  guidance, Compose for TV guidance, and Material for TV component behavior as
+  the baseline for every UI change. Check current documentation and official
+  samples before inventing an interaction pattern or working around an
+  unfamiliar component.
+- Prefer official Material for TV components and semantics. Do not recreate a
+  component that the installed TV Material version provides, and do not use a
+  focusable mobile Material control when a TV equivalent exists.
+- Design for a ten-foot, 16:9, remote-only experience first. Every screen must
+  have deterministic initial focus, complete D-pad reachability, predictable
+  Back behavior, visible focus at viewing distance, and focus restoration after
+  navigation or recomposition. Avoid dead focus containers and scale effects
+  that clip inside lists or safe areas.
+- Treat key dispatch as stateful navigation. Consume an event when it reveals,
+  replaces, or moves focus to new UI so that the same press cannot activate the
+  newly focused control. Cover these transitions with policy or UI tests.
+- Respect TV-safe content margins, large readable type, concise labels, strong
+  focused/unfocused contrast, and stable layouts for long localized text.
+  Touch-only affordances, hover assumptions, dense mobile forms, and subtle
+  color-only state are not acceptable TV interactions.
+- For video-backed UI, preserve the live picture with deliberate scrims and
+  layered surfaces rather than uncontrolled transparency. Keep dense guides and
+  settings more opaque than browsing chrome, keep focused controls strongest,
+  and avoid blur or effects that add GPU cost without improving comprehension.
+- Preserve accessibility semantics, meaningful content descriptions, and clear
+  selected/focused state. Validate loading, empty, error, reconnecting, and
+  long-content states rather than only the happy path.
+- Compile focused Compose UI coverage where practical, then validate focus,
+  clipping, readability, and motion on the physical TV. ADB screenshots cannot
+  prove SurfaceView video visibility or human-perceived motion quality.
+
 ## Engineering workflow
 
 - State assumptions before ambiguous or architectural work.
@@ -189,7 +223,8 @@ obligations are satisfied.
 
 ## Git discipline
 
-- Branch from the appropriate upstream/fork base; do not develop on `master`.
+- Direct local development on `master` is allowed during rapid iteration. Use a
+  branch for upstream contributions, parallel work, or risky experiments.
 - Keep commits small, buildable, and independently reviewable.
 - Do not force-push, rewrite published history, or amend commits unless the user
   explicitly asks.
