@@ -10,11 +10,13 @@ clean path for contributing generic improvements back upstream.
 Before non-trivial work:
 
 1. Read `docs/appliance-mode-spec.md`.
-2. Read `docs/appliance-mode-plan.md` and identify the current task.
-3. Run `git status -sb` and inspect the recent log.
-4. Fetch both remotes before changing code:
+2. Read `docs/device-targets.md` before any build, install, ADB, or physical-TV
+   work.
+3. Read `docs/appliance-mode-plan.md` and identify the current task.
+4. Run `git status -sb` and inspect the recent log.
+5. Fetch both remotes before changing code:
    `git fetch origin && git fetch fork`.
-5. Run `./tools/check-ai-harness` when changing agents, skills, commands, or
+6. Run `./tools/check-ai-harness` when changing agents, skills, commands, or
    OpenCode configuration.
 
 `origin` is the upstream repository. `fork` is Bernhard's public fork. Never
@@ -110,6 +112,10 @@ introduce abstractions for a single use.
   Firebase configuration.
 - Runtime device addresses belong in ignored `.tvhstream-device.json` or the
   `TVHSTREAM_ADB_SERIAL` environment variable.
+- The dining-room G10 is the current development target and may use local role
+  `test`. The bedroom G08 is handed-over production and must use role
+  `production`. The exact identities and lifecycle rules are in
+  `docs/device-targets.md`.
 - Do not modify TVHeadend server accounts, tuners, OSCam, recording storage,
   stream profiles, TCL/Google packages, or network infrastructure from this
   repository unless the user explicitly approves that separate operation.

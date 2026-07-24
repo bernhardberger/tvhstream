@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / ".opencode/opencode.json"
 REQUIRED_FILES = (
     "AGENTS.md",
+    "docs/device-targets.md",
     ".opencode/opencode.json",
     ".opencode/agents/android-appliance.md",
     ".opencode/agents/android-reviewer.md",
@@ -69,6 +70,8 @@ def main() -> int:
         errors.append("project session sharing must remain disabled")
     if config.get("subagent_depth") != 0:
         errors.append("automatic subagent depth must remain zero")
+    if config.get("instructions") != ["AGENTS.md", "docs/device-targets.md"]:
+        errors.append("project instructions must load AGENTS.md and docs/device-targets.md")
     if config.get("permission", {}).get("task") != "deny":
         errors.append("project task/subagent permission must remain denied")
 
@@ -97,6 +100,7 @@ def main() -> int:
     harness_paths = [
         ROOT / "AGENTS.md",
         ROOT / "docs/ai-engineering-harness.md",
+        ROOT / "docs/device-targets.md",
         ROOT / ".tvhstream-device.example.json",
         *sorted((ROOT / ".opencode").rglob("*.md")),
         *sorted((ROOT / "tools").glob("*")),
