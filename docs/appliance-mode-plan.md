@@ -23,6 +23,62 @@
 - Treat initial channel metadata as one atomic snapshot: HTSP control delivery
   applies backpressure instead of dropping messages, and the repository publishes
   channels only after `initialSyncCompleted`.
+- Use TV Material for focusable Compose controls. Retain mobile Material only
+  for primitives not supplied by TV Material 1.1.0, under one coordinated theme.
+- Use TV Material's standard navigation drawer and list-item geometry on a
+  shared 48/32 dp overscan-safe grid. Disable focus scaling where rows sit in a
+  clipped scrolling viewport, and present playback channel selection as a
+  full-height edge sheet with a cinematic scrim rather than an inset card.
+- Serialize HTSP teardown and player commands, keep repository flow creation
+  thread-safe, and test timeout/Back/key policies independently of Android UI.
+- Keep credential input transient, disable app backup/device transfer, and make
+  Keystore/decryption failure explicit rather than silently trying anonymous auth.
+- Permit repeatable development provisioning only for exact-identity test
+  devices: stream an ignored owner-only local secret over stdin into a debug-only
+  app-private startup importer, then retain the password only through the existing
+  Android Keystore-backed store. Release builds expose no importer or component.
+- Preserve TVHeadend channel numbers through the UI and direct-entry policy;
+  fall back to one-based positions only for servers with no channel numbers.
+- Support app-specific German, English, and Czech selection and persist the
+  operator preference for showing the main EPG menu.
+- Retry interrupted playback through the serialized player command gate with
+  bounded 1/2/5/10/30-second backoff and visible, Back-cancellable recovery UI.
+- Consume OK and D-pad Down when they reveal hidden playback controls so the same
+  key event cannot activate a newly focused control. Treat selection of the
+  current playback channel as a drawer-close action rather than a tune request.
+- Keep the active service warm while Back exposes the foreground Channel List.
+  A same-service player request is idempotent, while `MainActivity.onStop` remains
+  the hard boundary that stops playback for HOME or other background transitions.
+- Mount the Media3 `PlayerView` at the app root so operator screens retain live
+  video as well as audio under a dark navigation scrim. Player controls remain a
+  player-route concern; navigation does not detach or recreate the stream surface.
+
+## Hardening checkpoint: 2026-07-24
+
+The repository-wide audit remediation is implemented on
+`hardening/audit-findings`:
+
+- HTSP no-response and idle-reader disconnect deadlocks have regression tests
+  and transport-first cleanup.
+- The full verifier covers native integrity, Python tool policy, JVM tests,
+  lint, Android-test compilation, APK assembly/identity, and 16 KB alignment.
+- Credential saved-state/backup exposure, repository flow races, player command
+  ordering, nested settings Back, and forced process exit are fixed.
+- Focusable UI is migrated to TV Material with safe-area spacing,
+  lifecycle-aware state collection, localized navigation/status copy, and
+  physical media play/pause key handling.
+- Inherited Firebase/Play/GitHub release automation is removed; read-only CI,
+  accurate README/privacy text, and production/test device roles are in place.
+- Native AAR hashes, libraries, ABIs, and ELF alignment are recorded and
+  checked. Exact source/toolchain provenance and complete notices are absent,
+  so signed release distribution remains blocked by the strict native gate.
+
+No runtime validation was performed during that code-only checkpoint. The
+dining-room TCL Smart TV Pro has since been assigned as a temporary test target;
+the hardened APK was installed and launched there, revealing that this branch
+still needed the divergent localization/options/recovery feature set ported. The
+corrected APK still requires the full playback, focus, remote, standby/wake, and
+reboot matrix before deployment to the production household TV.
 
 ## Phase 1: Reproducible private build identity
 
@@ -37,7 +93,7 @@
 **Verification:**
 
 ```bash
-./gradlew testDebugUnitTest assembleDebug --no-daemon
+./tools/verify
 aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -81,8 +137,8 @@ aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 
 - Top-row and numpad `0`-`9` key codes build a visible 1- to 3-digit overlay
   during playback.
-- Entered numbers select the matching 1-based channel shown in the ordered
-  channel list.
+- Entered numbers select the matching TVHeadend channel number. One-based list
+  positions are used only if the server supplies no channel numbers.
 - One- and two-digit entries tune after 1.5 seconds or immediately on OK; a
   complete three-digit entry remains visible briefly before tuning.
 - Back cancels pending entry, and invalid or out-of-range numbers do not change
@@ -112,10 +168,12 @@ for a new explicit launch. Compose waits for persisted state and non-empty
 current channels, then consumes the matching request before navigating to the
 player. Recomposition, resume, and player Back do not generate requests.
 
-Runtime verification confirmed that force-stop plus launch restored ORF1 HD,
-Back stopped playback without replay while the UI remained open, and a new
-explicit launcher intent started ORF1 HD exactly once. ServusTV HD Oesterreich
-also passed the direct human interlaced-motion regression check.
+Runtime verification confirmed that force-stop plus launch restored ORF1 HD and
+a new explicit launcher intent started ORF1 HD exactly once. Back originally
+stopped playback; the later operator-UI redesign intentionally keeps that session
+warm only while the activity remains foreground so returning from the Channel
+List does not retune. ServusTV HD Oesterreich also passed the direct human
+interlaced-motion regression check.
 
 **Acceptance criteria:**
 
@@ -212,6 +270,10 @@ and an approved cold reboot with enabled-service and app-op state rechecked.
 - Release package upgrades over itself and remains 32-bit compatible.
 - APK SHA-256, signing fingerprint, source commit, and rollback commands are
   documented without secrets.
+- `./tools/check-native-libs --release` passes with exact corresponding source,
+  toolchain, license, and notice evidence for every bundled decoder AAR.
+- Final product name and clean-break application ID are decided before stable
+  signing; inherited Play/Fastlane workflows must not be re-enabled unchanged.
 
 **Verification:** unit suite, release build, `apksigner verify`, install/upgrade,
 and complete TCL runtime matrix.

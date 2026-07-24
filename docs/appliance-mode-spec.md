@@ -5,7 +5,7 @@
 Turn the GPLv3 TVHStream Android TV client into a single-purpose live-TV
 appliance for a household user who should not need to navigate Google TV.
 
-The app must keep TVHeadend's existing `mberger` account local to the device,
+The app must keep the configured household TVHeadend account local to the device,
 play the last selected channel after an appliance launch, support physical
 channel and number buttons, reclaim TCL's globally intercepted TV/GUIDE button,
 and enter live TV after boot or display wake through a narrowly scoped
@@ -18,10 +18,12 @@ backs out to those screens.
 ## Tech stack
 
 - Android API 28 minimum / API 36 target
-- Kotlin 2.3.10 and Jetpack Compose
+- Kotlin 2.3.10, Jetpack Compose, and AndroidX TV Material 1.1.0 for focusable UI
 - AndroidX Media3 / ExoPlayer 1.9.2
 - TVHeadend HTSP through the existing custom extractor
 - Preferences DataStore for non-secret last-channel state
+- Android Keystore/AES-GCM for the TVHeadend password, with backup and device
+  transfer disabled and password input excluded from saved-instance state
 - Android `AccessibilityService` for GUIDE filtering plus boot/wake appliance
   entry, without subscribing to accessibility events or window content
 - GPL-3.0; the public fork retains upstream copyright and license material
@@ -29,7 +31,8 @@ backs out to those screens.
 ## Commands
 
 ```bash
-./gradlew testDebugUnitTest assembleDebug --no-daemon
+./tools/verify
+# Mutating commands require an explicitly configured test device.
 ./tools/device install-debug
 ./tools/device launch
 ```
@@ -41,9 +44,16 @@ on the Android debug keystore.
 
 - The deployed household TV is a production appliance. Do not use it for routine
   debug APK installs, ADB key injection, smoke tests, or development experiments.
-- A separate debug/test TV is not yet assigned. Device testing must wait until a
-  new target is explicitly configured in ignored local device configuration and
-  its identity has been verified.
+- The dining-room TCL Smart TV Pro is the temporary debug/test target. Its address
+  remains only in ignored local device configuration, and tooling must verify its
+  manufacturer and model before every mutation.
+- `tools/device` enforces this boundary: production and unclassified devices
+  reject install, launch, force-stop, smoke, synthetic-key, and credential-
+  provisioning actions.
+- A designated test device may receive TVHeadend credentials through the
+  debug-only app-private provisioning path after role and live manufacturer/model
+  validation. Secret values travel only over process stdin from an ignored,
+  owner-only local file and are never entered through the TV UI.
 
 ## Project structure
 
@@ -74,9 +84,11 @@ fun adjacentChannelId(
 
 ## Testing strategy
 
-- Unit-test channel navigation, wrapping, number entry, and launch-policy
-  decisions.
-- Run the complete existing JVM unit-test suite and build the APK.
+- Unit-test channel navigation, wrapping, TVHeadend number entry, playback
+  recovery backoff, UI defaults, language parsing, and launch-policy decisions.
+- Run JVM tests, lint, instrumentation-test compilation, and build the APK.
+- Verify audited native AAR hashes, ABI layout, ELF/APK 16 KB alignment, and
+  release-provenance status.
 - Install beside both stock Headent and the temporary upstream-package
   TVHStream diagnostic build.
 - Runtime-test progressive and interlaced playback, `CH+`, `CH-`, 1- to 3-digit
@@ -90,9 +102,18 @@ fun adjacentChannelId(
 ### Always
 
 - Keep credentials in app-private storage; never hardcode or commit them.
+- Restrict automated credential provisioning to exact-identity test devices;
+  keep it unavailable in release builds and on production/unclassified devices.
 - Preserve a route to channel list, EPG, and settings through Back navigation.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
 - Use a distinct Leoville application ID and stable signing key.
+- Keep the operator UI on one overscan-safe TV layout grid. Use TV Material
+  navigation drawers and list items rather than hand-built focusable replicas;
+  focused rows must remain unclipped, and the playback channel sheet must attach
+  to the screen edge instead of floating like a dialog.
+- Reveal hidden playback controls with OK or D-pad Down. Picking the channel that
+  is already playing from the playback channel sheet closes the sheet without
+  rebuilding or restarting the player session.
 - Consume only Android GUIDE and the captured TCL TV key code in the
   accessibility service; boot/wake entry must not subscribe to accessibility
   events or inspect window content.
@@ -120,19 +141,26 @@ fun adjacentChannelId(
 3. Physical `CH+` and `CH-` switch to adjacent visible channels and wrap at the
    ends of the list.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
-   visible channel after 1 to 3 digits.
+   TVHeadend channel number after 1 to 3 digits. Positional numbering is used only
+   when the server supplies no channel numbers at all.
 5. The last successfully selected channel survives process death and reboot.
 6. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
    and channel data, then plays the persisted channel or the first channel. If
    playback is already visible, the entry intent must not restart it.
-7. Back exits playback to the normal TVHStream UI without an autoplay loop.
+7. Back reveals the normal TVHStream UI without an autoplay loop and keeps the
+   foreground live session and video surface warm behind a readable navigation
+   scrim. Selecting the same channel returns to playback without retuning;
+   leaving the activity stops the session.
 8. The accessibility service ignores every key except Android GUIDE and the
    captured TCL TV key code, does not subscribe to accessibility events or
    window content, and does not interfere with keys while disabled.
 9. Google Basic TV, Headent, and the diagnostic TVHStream package remain
    available as rollback paths during validation.
 10. Unit tests pass, the release APK is signed with the stable private key, and
-   installed package/signature/version details are recorded without secrets.
+    installed package/signature/version details are recorded without secrets.
+    The strict native release-provenance gate must also pass.
+11. The operator UI can follow the system language or explicitly select German,
+    English, or Czech, and can hide the main EPG menu without disabling playback.
 
 ## Open questions
 

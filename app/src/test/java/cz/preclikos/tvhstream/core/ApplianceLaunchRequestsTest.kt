@@ -71,4 +71,14 @@ class ApplianceLaunchRequestsTest {
         // Closing the player has no request-producing policy event.
         assertNull(requests.pending.value)
     }
+
+    @Test
+    fun pendingStartup_canBeCancelledForOperatorAccess() {
+        val requests = ApplianceLaunchRequests()
+        val pending = requireNotNull(requests.pending.value)
+
+        assertTrue(requests.cancel(pending))
+        assertNull(requests.pending.value)
+        assertNull(requests.resolve(channels, persistedId = 20))
+    }
 }

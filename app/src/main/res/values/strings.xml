@@ -2,6 +2,9 @@
     <string name="app_name" translatable="false">Leoville TV</string>
 
     <string name="channel_list">Channel List</string>
+    <string name="nav_channels">Channels</string>
+    <string name="nav_epg">Guide</string>
+    <string name="nav_settings">Settings</string>
 
     <string name="player_ends_in">Ends at: %1$s</string>
     <string name="player_next_event">Up next: %1$s</string>
@@ -17,13 +20,31 @@
 
     <!-- Settings screen -->
     <string name="settings_server">Settings - Connection</string>
+    <string name="settings_language">Settings - Language</string>
+    <string name="settings_language_nav">Language</string>
+    <string name="settings_options">Settings - Options</string>
+    <string name="settings_options_nav">Options</string>
+    <string name="show_epg_menu">Show guide menu</string>
+    <string name="show_epg_menu_enabled">Show guide menu: On</string>
+    <string name="show_epg_menu_disabled">Show guide menu: Off</string>
     <string name="host">Host</string>
     <string name="port_htsp">Htsp Port</string>
     <string name="port_http">Http Port</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
+    <string name="password_replacement_hint">The saved password is never displayed. Enter a new value only to replace it.</string>
+    <string name="clear_saved_password">Clear saved password</string>
+    <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
+    <string name="credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
 
     <string name="settings_player">Settings - Player</string>
+    <string name="settings_connection_nav">Connection</string>
+    <string name="settings_player_nav">Player</string>
+    <string name="settings_appliance_nav">Appliance</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_german">German</string>
+    <string name="language_english">English</string>
+    <string name="language_czech">Czech</string>
     <string name="profile">Profile</string>
     <string name="audio_language">Audio Language</string>
     <string name="subtitle_language">Subtitle Language</string>
@@ -35,6 +56,13 @@
     <string name="open_accessibility_settings">Open accessibility settings</string>
     <string name="appliance_accessibility_service_label">Leoville appliance entry</string>
     <string name="appliance_accessibility_service_description">Opens Leoville TV at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
+    <string name="appliance_starting_tv">Starting television…</string>
+    <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
+    <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
+
+    <string name="player_starting_channel">Starting channel…</string>
+    <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
+    <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
 
     <string name="loading_wait">Waiting for loading…</string>
     <string name="not_connected">Not connected</string>
@@ -62,6 +90,7 @@
 
     <!-- Common -->
     <string name="close">Close</string>
+    <string name="stop_playback">Stop playback</string>
 
 
     <!-- ===== EPG ===== -->
@@ -81,6 +110,17 @@
     <string name="tvh_no_input">No input</string>
 
     <string name="status_epg_loading">Loading guide\u2026</string>
+    <string name="status_disconnected_reconnecting">Disconnected. Reconnecting\u2026</string>
+    <string name="status_reconnect_delay">Reconnect in 5 seconds\u2026</string>
+    <string name="status_connecting">Connecting to %1$s:%2$d</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_syncing">Syncing\u2026</string>
+    <string name="status_connection_failed">Connection failed: %1$s</string>
+    <string name="status_connection_failed_authentication">Connection failed: authentication rejected</string>
+    <string name="status_connection_failed_dns">Connection failed: server name not found</string>
+    <string name="status_connection_failed_unreachable">Connection failed: server unreachable</string>
+    <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
+    <string name="status_connection_failed_other">Connection failed</string>
 
     <string name="status_epg_warmup">Guide: loading %1$d/%2$d</string>
     <string name="status_epg_steady_warmup">Guide: ready (loaded %1$d/%2$d)</string>

@@ -27,14 +27,29 @@ object ChannelNavigation {
         }
     }
 
-    fun idForNumber(orderedIds: List<Int>, enteredNumber: String): Int? {
+    fun idForNumber(
+        orderedIds: List<Int>,
+        channelNumbers: Map<Int, Int?>,
+        enteredNumber: String,
+    ): Int? {
         val number = enteredNumber.toIntOrNull() ?: return null
-        return orderedIds.getOrNull(number - 1)
+        orderedIds.firstOrNull { channelNumbers[it] == number }?.let { return it }
+
+        return if (channelNumbers.values.none { it != null }) {
+            orderedIds.getOrNull(number - 1)
+        } else null
     }
 
-    fun numberForId(orderedIds: List<Int>, channelId: Int): Int? {
+    fun numberForId(
+        orderedIds: List<Int>,
+        channelNumbers: Map<Int, Int?>,
+        channelId: Int,
+    ): Int? {
         val index = orderedIds.indexOf(channelId)
-        return if (index >= 0) index + 1 else null
+        if (index < 0) return null
+
+        return channelNumbers[channelId]
+            ?: if (channelNumbers.values.none { it != null }) index + 1 else null
     }
 
     fun adjacentId(

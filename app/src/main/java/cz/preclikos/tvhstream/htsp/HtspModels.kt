@@ -90,6 +90,7 @@ sealed interface HtspEvent {
 data class ChannelUi(
     val id: Int,
     val name: String,
+    val number: Int?,
     val icon: String?
 )
 

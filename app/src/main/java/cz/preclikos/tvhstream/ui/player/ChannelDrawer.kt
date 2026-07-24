@@ -1,18 +1,13 @@
 package cz.preclikos.tvhstream.ui.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -34,9 +31,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.ChannelUi
 import cz.preclikos.tvhstream.ui.common.progress
 import cz.preclikos.tvhstream.ui.components.ChannelRow
+import cz.preclikos.tvhstream.ui.TvPlaybackPadding
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -54,11 +53,11 @@ fun ChannelDrawer(
     onCloseDrawer: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
-
-    val selectedRowFocus = remember { FocusRequester() }
 
     LaunchedEffect(channels, selectedId) {
         if (didInitialRestore) return@LaunchedEffect
@@ -77,20 +76,24 @@ fun ChannelDrawer(
         }.filter { it }.first()
 
         withFrameNanos { }
-        selectedRowFocus.requestFocus()
+        focusRequester.requestFocus()
         withFrameNanos { }
 
         didInitialRestore = true
         isRestoring = false
     }
 
-    Surface(
-        tonalElevation = 6.dp,
+    Box(
         modifier = Modifier
-            .width(300.dp)
+            .width(460.dp)
             .fillMaxHeight()
-            .focusRequester(focusRequester)
-            .focusable()
+            .background(
+                Brush.horizontalGradient(
+                    0f to Color.Black.copy(alpha = 0.96f),
+                    0.82f to Color.Black.copy(alpha = 0.92f),
+                    1f to Color.Transparent,
+                )
+            )
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (ev.key) {
@@ -104,22 +107,26 @@ fun ChannelDrawer(
     ) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(vertical = 10.dp),
+            contentPadding = TvPlaybackPadding,
             modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
+                .width(420.dp)
+                .fillMaxHeight()
                 .focusGroup()
                 .focusRestorer()
         ) {
-            itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
+            items(channels, key = { ch -> ch.id }) { ch ->
                 val isSelected = ch.id == selectedId
 
                 val now = remember(ch.id, nowSec) { channelsVm.nowEvent(ch.id, nowSec) }
                 val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
 
                 ChannelRow(
-                    modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
-                    number = index + 1,
+                    modifier = if (isSelected) Modifier.focusRequester(focusRequester) else Modifier,
+                    number = ChannelNavigation.numberForId(
+                        orderedChannelIds,
+                        channelNumbers,
+                        ch.id,
+                    ),
                     name = ch.name,
                     programTitle = now?.title ?: stringResource(R.string.no_epg),
                     progress = if (now != null) prog else null,
@@ -130,10 +137,6 @@ fun ChannelDrawer(
                     onConfirm = { onPickChannel(ch) }
                 )
 
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                )
             }
         }
     }

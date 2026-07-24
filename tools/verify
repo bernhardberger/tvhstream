@@ -27,8 +27,19 @@ if [[ ! -d "$ANDROID_HOME" ]]; then
     exit 1
 fi
 
-printf '==> JVM tests and debug APK\n'
-./gradlew testDebugUnitTest assembleDebug --no-daemon
+printf '==> Native dependency integrity\n'
+./tools/check-native-libs
+
+printf '==> Tool policy tests\n'
+python3 -m unittest discover -s tools/tests
+
+printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
+./gradlew \
+    testDebugUnitTest \
+    lintDebug \
+    compileDebugAndroidTestKotlin \
+    assembleDebug \
+    --no-daemon
 
 apk="app/build/outputs/apk/debug/app-debug.apk"
 if [[ ! -f "$apk" ]]; then
@@ -37,19 +48,27 @@ if [[ ! -f "$apk" ]]; then
 fi
 
 aapt=""
+zipalign=""
 for candidate in \
-    "$ANDROID_HOME/build-tools/36.0.0/aapt" \
-    "$ANDROID_HOME/build-tools/35.0.0/aapt"; do
-    if [[ -x "$candidate" ]]; then
-        aapt="$candidate"
+    "$ANDROID_HOME/build-tools/36.0.0" \
+    "$ANDROID_HOME/build-tools/35.0.0"; do
+    if [[ -x "$candidate/aapt" && -x "$candidate/zipalign" ]]; then
+        aapt="$candidate/aapt"
+        zipalign="$candidate/zipalign"
         break
     fi
 done
-if [[ -z "$aapt" ]] && command -v aapt >/dev/null 2>&1; then
+if [[ -z "$aapt" ]] && command -v aapt >/dev/null 2>&1 && command -v zipalign >/dev/null 2>&1; then
     aapt="$(command -v aapt)"
+    zipalign="$(command -v zipalign)"
 fi
-if [[ -z "$aapt" ]]; then
-    printf 'error: aapt not found in Android build-tools or PATH\n' >&2
+if [[ -z "$aapt" || -z "$zipalign" ]]; then
+    printf 'error: aapt and zipalign are required in Android build-tools or PATH\n' >&2
+    exit 1
+fi
+
+if ! "$zipalign" -c -P 16 4 "$apk"; then
+    printf 'error: APK native libraries are not 16 KB zip-aligned\n' >&2
     exit 1
 fi
 

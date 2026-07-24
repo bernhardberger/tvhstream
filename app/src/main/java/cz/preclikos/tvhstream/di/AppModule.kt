@@ -10,6 +10,7 @@ import cz.preclikos.tvhstream.services.StatusServiceImpl
 import cz.preclikos.tvhstream.settings.PlayerSettingsStore
 import cz.preclikos.tvhstream.settings.SecurePasswordStore
 import cz.preclikos.tvhstream.settings.ServerSettingsStore
+import cz.preclikos.tvhstream.settings.UiSettingsStore
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.stores.LastPlayedChannelStore
 import cz.preclikos.tvhstream.viewmodels.AppConnectionViewModel
@@ -39,6 +40,7 @@ val appModule = module {
     single { ServerSettingsStore(context = get()) }
     single { SecurePasswordStore(context = get()) }
     single { PlayerSettingsStore(context = get()) }
+    single { UiSettingsStore(context = get()) }
 
     single { ChannelSelectionStore() }
     single { LastPlayedChannelStore(context = get()) }

@@ -42,8 +42,10 @@ exact commit graph and proposed range. Preserve published appliance history.
 3. Keep the patch narrow and match upstream naming/style.
 4. Add a regression test that proves the generic behavior.
 5. Run upstream-relevant tests and `./tools/verify`.
-6. Retain upstream copyright and GPLv3 licensing.
-7. Summarize behavior, tests, and any Android-device evidence without exposing
+6. Exclude fork-only native binary manifests, release policy, device roles, and
+   product identity unless the upstream change specifically requires them.
+7. Retain upstream copyright and GPLv3 licensing.
+8. Summarize behavior, tests, and any Android-device evidence without exposing
    private runtime data.
 
 Publishing a branch or opening a pull request requires explicit user approval.

@@ -1,6 +1,5 @@
 package cz.preclikos.tvhstream.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,16 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.SurfaceDefaults
+import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,14 +38,18 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import cz.preclikos.tvhstream.R
+import cz.preclikos.tvhstream.core.ChannelNavigation
 import cz.preclikos.tvhstream.htsp.EpgEventEntry
 import cz.preclikos.tvhstream.stores.ChannelSelectionStore
 import cz.preclikos.tvhstream.ui.common.formatHm
 import cz.preclikos.tvhstream.ui.common.progress
 import cz.preclikos.tvhstream.ui.components.ChannelRow
 import cz.preclikos.tvhstream.ui.components.PiconBox
+import cz.preclikos.tvhstream.ui.TvScreenPadding
+import cz.preclikos.tvhstream.ui.TvBrowsePanelAlpha
 import cz.preclikos.tvhstream.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -62,8 +64,10 @@ fun ChannelsScreen(
     imageLoader: ImageLoader = koinInject(),
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
-    val channels by channelViewModel.channels.collectAsState()
-    val selectedId by selection.selectedId.collectAsState()
+    val channels by channelViewModel.channels.collectAsStateWithLifecycle()
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
+    val selectedId by selection.selectedId.collectAsStateWithLifecycle()
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
 
@@ -120,37 +124,42 @@ fun ChannelsScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(14.dp)
+            .padding(TvScreenPadding)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.channel_list),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(20.dp))
 
         Row(Modifier.fillMaxSize()) {
             Surface(
                 tonalElevation = 2.dp,
                 shape = MaterialTheme.shapes.medium,
+                colors = SurfaceDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = TvBrowsePanelAlpha
+                    ),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.48f)
+                    .weight(0.44f)
             ) {
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
                     modifier = Modifier
                         .focusGroup()
                         .focusRestorer()
                 ) {
-                    itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
+                    items(channels, key = { ch -> ch.id }) { ch ->
                         val isSelected = ch.id == selectedId
                         val now =
                             remember(ch.id, nowSec) { channelViewModel.nowEvent(ch.id, nowSec) }
@@ -158,7 +167,11 @@ fun ChannelsScreen(
 
                         ChannelRow(
                             modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
-                            number = index + 1,
+                            number = ChannelNavigation.numberForId(
+                                orderedChannelIds,
+                                channelNumbers,
+                                ch.id,
+                            ),
                             name = ch.name,
                             programTitle = now?.title ?: stringResource(R.string.no_epg),
                             progress = if (now != null) prog else null,
@@ -171,22 +184,24 @@ fun ChannelsScreen(
                             onConfirm = { onPlay(ch.id, ch.id, ch.name) }
                         )
 
-                        HorizontalDivider(
-                            thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                        )
                     }
                 }
             }
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(24.dp))
 
             Surface(
                 tonalElevation = 2.dp,
                 shape = MaterialTheme.shapes.medium,
+                colors = SurfaceDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = TvBrowsePanelAlpha
+                    ),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.52f)
+                    .weight(0.56f)
             ) {
                 EpgDetailPane(
                     channelName = focusedChannel?.name ?: "—",
@@ -211,7 +226,7 @@ private fun EpgDetailPane(
     piconPath: String? = null,
 ) {
     val progress = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
-    Column(Modifier.padding(14.dp)) {
+    Column(Modifier.padding(24.dp)) {
 
         Row(
             Modifier.fillMaxWidth(),

@@ -1,20 +1,24 @@
 package cz.preclikos.tvhstream.ui.screens.settings
 
+import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.tv.material3.Button
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,6 +32,7 @@ import cz.preclikos.tvhstream.settings.SecurePasswordStore
 import cz.preclikos.tvhstream.settings.ServerSettingsStore
 import cz.preclikos.tvhstream.ui.components.TvOutlinedTextField
 import cz.preclikos.tvhstream.ui.components.TvPasswordField
+import cz.preclikos.tvhstream.ui.components.SettingsPane
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -38,13 +43,23 @@ fun SettingsConnection(
     passwordStore: SecurePasswordStore = koinInject()
 ) {
     val scope = rememberCoroutineScope()
+    val activity = LocalActivity.current
+
+    DisposableEffect(activity) {
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
 
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
 
     var host by rememberSaveable { mutableStateOf("") }
     var htspPort by rememberSaveable { mutableStateOf("9982") }
     var user by rememberSaveable { mutableStateOf("") }
-    var pass by rememberSaveable { mutableStateOf("") }
+    var pass by remember { mutableStateOf("") }
+    var passwordChanged by remember { mutableStateOf(false) }
+    var credentialError by remember { mutableStateOf(false) }
     var auto by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -52,23 +67,14 @@ fun SettingsConnection(
         host = s.host
         htspPort = s.htspPort.toString()
         user = s.username
-        pass = passwordStore.getPassword()
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.settings_server),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(top = 10.dp)
-        )
-
-        Column(modifier = Modifier.focusGroup()) {
+    SettingsPane(title = stringResource(R.string.settings_server)) {
+        Column(
+            modifier = Modifier
+                .width(560.dp)
+                .focusGroup()
+        ) {
 
             TvOutlinedTextField(
                 id = "host",
@@ -109,21 +115,60 @@ fun SettingsConnection(
                 editingId = editingId,
                 setEditingId = { editingId = it },
                 value = pass,
-                onValueChange = { pass = it }
+                onValueChange = {
+                    pass = it
+                    passwordChanged = true
+                    credentialError = false
+                }
+            )
+
+            Text(
+                text = stringResource(R.string.password_replacement_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(Modifier.height(12.dp))
+        }
+
+        if (credentialError) {
+            Text(
+                text = stringResource(R.string.credential_save_failed),
+                color = MaterialTheme.colorScheme.error,
+            )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
                 val pHtsp = htspPort.toIntOrNull() ?: 9982
                 scope.launch {
-                    settingsStore.saveServer(host, pHtsp, user, auto)
-                    passwordStore.setPassword(pass)
+                    try {
+                        if (passwordChanged) passwordStore.setPassword(pass)
+                        settingsStore.saveServer(host, pHtsp, user, auto)
+                        pass = ""
+                        passwordChanged = false
+                        credentialError = false
+                    } catch (_: Exception) {
+                        credentialError = true
+                    }
                 }
-            }, modifier = Modifier/*.focusRequester(hostFocus)*/) {
+            }) {
                 Text(stringResource(R.string.save))
+            }
+
+            OutlinedButton(onClick = {
+                scope.launch {
+                    try {
+                        passwordStore.clear()
+                        pass = ""
+                        passwordChanged = false
+                        credentialError = false
+                    } catch (_: Exception) {
+                        credentialError = true
+                    }
+                }
+            }) {
+                Text(stringResource(R.string.clear_saved_password))
             }
         }
     }
