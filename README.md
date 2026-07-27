@@ -1,11 +1,18 @@
-# Development moved to TVHeadend Player for TV
+# This repository is no longer maintained
 
-Active product development continues at
-**[bernhardberger/tvheadend-player](https://github.com/bernhardberger/tvheadend-player)**.
-Use that repository for the current code, documentation, releases, and product
-issues.
+> [!IMPORTANT]
+> ## TVHeadend Player for TV has moved
+>
+> **All active development now happens in the standalone
+> [TVHeadend Player repository](https://github.com/bernhardberger/tvheadend-player).**
+>
+> Use the new repository for current code, documentation, releases, and product
+> information.
 
-This repository is retained only as a GitHub-network fork of
+Do not use this repository as the source for current TVHeadend Player builds.
+
+---
+
+This repository remains available only as a GitHub-network fork of
 [`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) for predecessor
-comparison and generic upstream contribution branches. It is not the canonical
-TVHeadend Player repository.
+comparison and generic upstream contribution branches.
