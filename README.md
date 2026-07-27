@@ -1,5 +1,12 @@
 # Leoville TV
 
+> [!IMPORTANT]
+> Active product development continues as
+> **[TVHeadend Player for TV](https://github.com/bernhardberger/tvheadend-player)**.
+> This repository remains connected to the original TVHStream fork network for
+> predecessor comparison and generic upstream contributions. The information
+> below describes an earlier transitional stage of the product.
+
 Leoville TV is the current working identity for an experimental, remote-first
 live TV client for Android TV and Google TV. It connects directly to a
 TVHeadend server over HTSP and uses AndroidX Media3 for playback.
